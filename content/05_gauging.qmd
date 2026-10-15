@@ -1,0 +1,294 @@
+---
+title: "5 วัดขนาดและสถานีตรวจ"
+subtitle: "สอบเทียบกล้อง วัดขนาดเหรียญหรือแหวนรอง ศึกษาความทำซ้ำได้ แล้วส่งผล OK/NG ไปบอร์ด Arduino"
+---
+
+<div class="chain"><span class="on">Scene + Camera</span><span class="on">Pixels</span><span class="on">Features</span><span class="on">Measurand</span><span class="on">Calibration</span><span class="on">Uncertainty</span><span class="on">Decision</span></div>
+
+## โจทย์
+
+สายการผลิตชิ้นงานกลมแบน (แหวนรอง เหรียญ ฝาโลหะ) ต้องการสถานีที่วัดเส้นผ่านศูนย์กลางทุกชิ้น แล้วให้ไฟเขียวเมื่อผ่านและไฟแดงเมื่อไม่ผ่าน คำถามสำคัญไม่ใช่ "วัดได้ไหม" แต่คือ **"วัดได้ดีพอสำหรับ tolerance นี้ไหม"**
+
+ใบงาน 2 พบว่าค่า $k$ ค่าเดียวผิดเมื่อชิ้นงานอยู่ที่มุมภาพ สาเหตุหลักคือ **lens distortion** เลนส์ทำให้เส้นตรงที่ขอบภาพโค้ง ใบงานนี้แก้ด้วยการสอบเทียบกล้องเต็มรูปแบบ
+
+```text
+Checkerboard x 15 views -> calibrateCamera -> undistort    (ส่วนที่ 1)
+Backlight -> contour -> diameter (mm) x 30 -> %GRR         (ส่วนที่ 2)
+Size vs tolerance -> OK/NG -> Serial -> UNO R4 -> LED      (ส่วนที่ 3)
+```
+
+**เมื่อจบใบงาน** นักศึกษาควรสามารถ
+
+- สอบเทียบกล้องด้วย checkerboard และแก้ภาพให้หาย distortion
+- วัดขนาดชิ้นงานบน backlight เป็น mm และเทียบกับเวอร์เนียร์
+- ศึกษาความทำซ้ำได้ของการวัด และตัดสินว่าระบบใช้กับ tolerance ที่กำหนดได้หรือไม่
+- ส่งผลตัดสินไปบอร์ดควบคุม และบันทึกผลทุกชิ้น
+
+**อุปกรณ์:**
+
+- กล้องพร้อมขาตั้ง และโทรศัพท์หรือแท็บเล็ตเครื่องที่ 2 เป็น backlight (เปิดภาพขาว วางกระดาษทับ แบบใบงาน 3)
+- `data/checkerboard.pdf` พิมพ์ขนาดจริง 100% แล้วติดบนแผ่นแข็งให้เรียบ
+- ชิ้นงาน: **เหรียญ 1, 5 และ 10 บาท** อย่างละ 2 เหรียญ (หรือแหวนรอง M3–M8 ถ้ามี)
+- เวอร์เนียร์คาลิปเปอร์
+- Arduino UNO R4 WiFi, LED เขียวและแดงพร้อมตัวต้านทาน 220 Ω
+
+## ส่วนที่ 1: สอบเทียบกล้อง
+
+### เก็บภาพ checkerboard
+
+checkerboard มี 10 x 7 ช่อง ช่องละ 25 mm จึงมี **มุมด้านใน 9 x 6 จุด** ที่รู้ตำแหน่งจริงแน่นอน OpenCV หามุมเหล่านี้ในภาพได้ละเอียดกว่า 1 pixel จากภาพหลายมุมมอง จึงคำนวณได้ทั้งความยาวโฟกัส จุดศูนย์กลางภาพ และค่า distortion ของเลนส์
+
+```python
+import cv2
+import numpy as np
+
+PATTERN = (9, 6)                    # inner corners (columns, rows)
+SQUARE = 25.0                       # mm
+
+objp = np.zeros((PATTERN[0] * PATTERN[1], 3), np.float32)
+objp[:, :2] = np.mgrid[0:PATTERN[0], 0:PATTERN[1]].T.reshape(-1, 2) * SQUARE
+
+obj_points, img_points = [], []
+criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+
+cap = cv2.VideoCapture(0)
+while len(obj_points) < 15:
+    ret, frame = cap.read()
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    found, corners = cv2.findChessboardCorners(gray, PATTERN)
+    view = frame.copy()
+    if found:
+        cv2.drawChessboardCorners(view, PATTERN, corners, found)
+    cv2.putText(view, f"{len(obj_points)}/15  (c = capture)", (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+    cv2.imshow("Calibration", view)
+    if cv2.waitKey(1) & 0xFF == ord('c') and found:
+        corners = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
+        obj_points.append(objp)
+        img_points.append(corners)
+
+err, K, dist, rvecs, tvecs = cv2.calibrateCamera(obj_points, img_points,
+                                                 gray.shape[::-1], None, None)
+print("reprojection error (pixel):", err)
+print("camera matrix K:\n", K)
+print("distortion (k1 k2 p1 p2 k3):", dist.ravel())
+np.savez("calib.npz", K=K, dist=dist)
+```
+
+::: {.callout-tip}
+## เก็บภาพให้ได้ผลดี
+ถือแผ่นให้เต็มภาพบ้าง อยู่ที่มุมภาพบ้าง เอียงหลายทิศ (ไม่เกิน 45 องศา) และถือให้นิ่งตอนกด `c` ถ้า reprojection error เกิน 1 pixel ให้เก็บภาพใหม่
+:::
+
+| ค่า | ผลที่ได้ |
+| :--- | :--- |
+| reprojection error (pixel) | |
+| $f_x$, $f_y$ (pixel) | |
+| $c_x$, $c_y$ (pixel) | |
+| $k_1$, $k_2$ | |
+
+### แก้ภาพและหาค่า $k$
+
+```python
+data = np.load("calib.npz")
+K, dist = data["K"], data["dist"]
+
+ret, frame = cap.read()
+undist = cv2.undistort(frame, K, dist)
+cv2.imshow("Original", frame)
+cv2.imshow("Undistorted", undist)
+```
+
+วาง checkerboard ราบ **บนจอที่ใช้เป็น backlight** (แผ่นแข็งวางทับจอได้) เพื่อให้อยู่ระนาบเดียวกับที่จะวางชิ้นงาน แล้วหาค่า mm/pixel จากระยะระหว่างมุมที่อยู่ติดกันในภาพที่แก้แล้ว ค่านี้เฉลี่ยจาก 93 คู่จุด จึงแม่นกว่าการคลิกไม้บรรทัดในใบงาน 2 มาก
+
+```python
+gray = cv2.cvtColor(undist, cv2.COLOR_BGR2GRAY)
+found, corners = cv2.findChessboardCorners(gray, PATTERN)
+corners = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
+grid = corners.reshape(PATTERN[1], PATTERN[0], 2)                  # rows x columns x (x, y)
+d_px = np.concatenate([np.linalg.norm(np.diff(grid, axis=1), axis=2).ravel(),
+                       np.linalg.norm(np.diff(grid, axis=0), axis=2).ravel()])
+k = SQUARE / d_px.mean()
+print(f"k = {k:.4f} mm/pixel  (S.D. of spacing {d_px.std():.2f} pixel)")
+```
+
+::: {.callout-warning}
+## ห้ามขยับกล้องหลังสอบเทียบ
+ค่า $k$ ใช้ได้เฉพาะระยะกล้องและระนาบที่สอบเทียบ ถ้ากล้องขยับ เปลี่ยน zoom/focus หรือเปลี่ยนเครื่องที่ใช้เป็น backlight (ความหนาต่างกัน) ต้องหา $k$ ใหม่ จำผลจากใบงาน 2 ที่ยกชิ้นงานสูง 3 cm แล้ว error เพิ่ม
+:::
+
+วัดซ้ำตารางสุดท้ายของใบงาน 2 โดยใช้ภาพที่แก้แล้ว
+
+| เงื่อนไข | error ก่อนแก้ (mm) | error หลังแก้ (mm) |
+| :--- | :--- | :--- |
+| ชิ้นงานกลางภาพ | | |
+| ชิ้นงานที่มุมภาพ | | |
+
+## ส่วนที่ 2: วัดขนาดและความทำซ้ำได้
+
+### วัดเส้นผ่านศูนย์กลางบน backlight
+
+เอา checkerboard ออกโดยไม่ขยับกล้องและจอ ปิดไฟห้อง ชิ้นงานจะเป็นเงาดำบนพื้นสว่าง (ใบงาน 3) ใช้ `RETR_CCOMP` เพื่อแยกขอบนอกออกจากรูตรงกลาง (ถ้าเป็นแหวนรอง)
+
+```python
+MIN_AREA = 300
+
+def measure(frame):
+    undist = cv2.undistort(frame, K, dist)
+    gray = cv2.cvtColor(undist, cv2.COLOR_BGR2GRAY)
+    _, bw = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    contours, hier = cv2.findContours(bw, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
+    parts = []
+    for i, cnt in enumerate(contours):
+        if hier[0][i][3] != -1 or cv2.contourArea(cnt) < MIN_AREA:
+            continue                                    # keep outer contours only
+        area = cv2.contourArea(cnt)
+        d_area = 2 * np.sqrt(area / np.pi) * k          # diameter of a circle with the same area
+        (x, y), r = cv2.minEnclosingCircle(cnt)
+        d_circle = 2 * r * k
+        parts.append(((int(x), int(y)), d_area, d_circle))
+    return undist, parts
+```
+
+วัดชิ้นงานแต่ละขนาดเทียบกับเวอร์เนียร์ (ค่าอ้างอิง)
+
+| ชิ้นงาน | เวอร์เนียร์ (mm) | $d$ จากพื้นที่ (mm) | $d$ จาก minEnclosingCircle (mm) | $e$ (mm) |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 บาท | | | | |
+| 5 บาท | | | | |
+| 10 บาท | | | | |
+
+### ความทำซ้ำได้ (repeatability)
+
+วัดเหรียญเดียวกัน 30 ครั้ง โดย **ยกออกแล้ววางใหม่ทุกครั้ง** ให้ตำแหน่งและมุมเปลี่ยนไปเล็กน้อยเหมือนในสายการผลิตจริง
+
+```python
+values = []
+while len(values) < 30:
+    ret, frame = cap.read()
+    undist, parts = measure(frame)
+    for (cx, cy), d, _ in parts:
+        cv2.putText(undist, f"{d:.2f} mm", (cx - 40, cy), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7, (0, 0, 255), 2)
+    cv2.imshow("Gauge", undist)
+    if cv2.waitKey(1) & 0xFF == ord(' ') and len(parts) == 1:     # space = record
+        values.append(parts[0][1])
+        print(len(values), f"{parts[0][1]:.3f}")
+
+values = np.array(values)
+print(f"mean = {values.mean():.3f} mm, S.D. = {values.std(ddof=1):.3f} mm")
+```
+
+เทียบความกระจายของการวัดกับความกว้างของช่วง tolerance (USL − LSL) แบบย่อของ **Gage R&R** ที่ใช้รับรองเครื่องมือวัดในโรงงาน
+
+$$
+\%\mathrm{GRR} \approx \frac{6\,\sigma_{\mathrm{meas}}}{\mathrm{USL} - \mathrm{LSL}} \times 100\%
+$$
+
+| %GRR | ความหมาย |
+| :--- | :--- |
+| ต่ำกว่า 10% | ระบบวัดใช้ได้ |
+| 10–30% | ใช้ได้แบบมีเงื่อนไข ขึ้นกับความสำคัญของงาน |
+| สูงกว่า 30% | ใช้ไม่ได้ ต้องปรับปรุงระบบวัด |
+
+| รายการ | ค่า |
+| :--- | :--- |
+| ค่าเฉลี่ย (mm) | |
+| $\sigma_{\mathrm{meas}}$ (mm) | |
+| 1 pixel = กี่ mm | |
+| %GRR ถ้า tolerance ±0.5 mm | |
+| %GRR ถ้า tolerance ±0.1 mm | |
+
+## ส่วนที่ 3: สถานีตรวจ
+
+### บอร์ดรับผล
+
+ต่อ LED เขียวที่ขา D2 และ LED แดงที่ขา D3 (ผ่านตัวต้านทาน 220 Ω) แล้วอัปโหลดสเก็ตช์นี้ บอร์ดรอรับตัวอักษร 1 ตัวทาง Serial
+
+```cpp
+const int GREEN = 2;
+const int RED = 3;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(GREEN, OUTPUT);
+  pinMode(RED, OUTPUT);
+}
+
+void loop() {
+  if (Serial.available()) {
+    char c = Serial.read();
+    digitalWrite(GREEN, c == 'G');      // G = OK
+    digitalWrite(RED, c == 'R');        // R = NG, anything else = both off
+  }
+}
+```
+
+### โปรแกรมสถานีตรวจ
+
+ผลจากภาพเดียวอาจผิดเพราะมือยังไม่ออกจากภาพหรือชิ้นงานยังไม่นิ่ง จึงตัดสินเมื่อได้ผลเดียวกัน **5 ภาพติดกัน** และส่งผลไปบอร์ดเพียงครั้งเดียวต่อชิ้น
+
+```python
+import csv
+import time
+import serial
+
+NOMINAL, TOL = 24.0, 0.5            # mm: e.g. a 5-baht coin; use your vernier value
+ser = serial.Serial("COM5", 115200, timeout=1)      # check the port in Device Manager
+time.sleep(2)                       # the board resets when the port opens
+
+log = open("inspection_log.csv", "a", newline="")
+writer = csv.writer(log)
+
+history, sent = [], None
+while True:
+    ret, frame = cap.read()
+    undist, parts = measure(frame)
+
+    if len(parts) == 1:
+        d = parts[0][1]
+        result = "G" if ______________________________ else "R"    # inside NOMINAL +- TOL?
+    else:
+        result = "0"                # no part (or more than one)
+    history = (history + [result])[-5:]
+
+    if len(history) == 5 and len(set(history)) == 1 and result != sent:
+        ser.write(result.encode())
+        sent = result
+        if result != "0":
+            writer.writerow([time.strftime("%Y-%m-%d %H:%M:%S"), f"{d:.3f}",
+                             "OK" if result == "G" else "NG"])
+            log.flush()
+            print(result, f"{d:.3f} mm")
+
+    cv2.imshow("Station", undist)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+ser.write(b"0")
+ser.close()
+log.close()
+```
+
+ตั้ง `NOMINAL` เป็นขนาดของเหรียญ 5 บาทที่วัดด้วยเวอร์เนียร์ แล้ววางเหรียญ 1, 5 และ 10 บาทสลับกัน 10 ครั้ง (ควรได้ OK เฉพาะเหรียญ 5 บาท) แล้วบันทึกผล และวัดเวลาตั้งแต่วางชิ้นงานจนไฟติดด้วยการถ่ายวิดีโอด้วยโทรศัพท์ (นับ frame ระหว่างสองเหตุการณ์)
+
+| รายการ | ค่า |
+| :--- | :--- |
+| ชิ้นที่ตัดสินถูก / ทั้งหมด | |
+| เวลาตั้งแต่วางชิ้นงานจนไฟติด (ms) | |
+| ชิ้นต่อนาทีสูงสุดที่ทำได้ | |
+
+::: {.callout-note}
+## คำถาม
+1. ระบบของคุณใช้ตรวจชิ้นงานที่ tolerance ±0.1 mm ได้หรือไม่ ถ้าไม่ได้ ต้องปรับอะไร (ความละเอียดกล้อง ระยะกล้อง แสง หรือวิธีวัด) และแต่ละทางแลกกับอะไร
+2. เหตุใด $d$ จากพื้นที่กับ $d$ จาก minEnclosingCircle จึงต่างกัน ควรใช้ค่าใดถ้าชิ้นงานมีรอยบิ่นที่ขอบ
+3. การรอให้ได้ผลเดียวกัน 5 ภาพติดกัน ช่วยเรื่องใด และทำให้เสียอะไร (เชื่อมกับใบงาน 3)
+4. **กลับไปดูรายการ "ยังขาดอะไร" ที่เขียนไว้ท้ายใบงาน 1** ตอนนี้ระบบของคุณมีข้อใดแล้ว และยังขาดข้อใด
+:::
+
+## ทบทวน
+
+- lens distortion ทำให้ $k$ ค่าเดียวผิดที่ขอบภาพ การสอบเทียบด้วย checkerboard แก้ได้ และให้ $k$ ที่แม่นกว่าการคลิกไม้บรรทัด
+- backlight + Otsu + contour เป็นสูตรพื้นฐานของงานวัดขนาดชิ้นงานแบน และต้องสอบเทียบที่ระนาบเดียวกับชิ้นงาน
+- ความแม่นของค่าเฉลี่ยไม่พอ ต้องรู้ความกระจาย (repeatability) และเทียบกับ tolerance ด้วย %GRR
+- สถานีตรวจที่ใช้งานได้ต้องตัดสินอย่างมั่นคง ส่งผลให้อุปกรณ์อื่น และบันทึกผลทุกชิ้นเพื่อการตรวจสอบย้อนกลับ

@@ -1,0 +1,326 @@
+---
+title: "3 แสง เวลา และการรับภาพ"
+subtitle: "ตั้งกล้องและแสงให้ได้ภาพที่ตรวจได้ แล้ววัดว่าระบบตรวจทันความเร็วการผลิตหรือไม่"
+---
+
+<div class="chain"><span class="on">Scene + Camera</span><span class="on">Pixels</span><span>Features</span><span>Measurand</span><span>Calibration</span><span class="on">Uncertainty</span><span>Decision</span></div>
+
+## โจทย์
+
+ในใบงาน 2 ช่วงสี HSV ที่ตั้งไว้ใช้ได้ตอนเช้าแต่ใช้ไม่ได้ตอนบ่าย และในใบงาน 1 ตัวเลขย่อภาพกับ `waitKey` ถูกกำหนดแบบเดา ใบงานนี้ตอบสองคำถามที่วิศวกรต้องตอบก่อนเขียนโค้ดตรวจสอบ
+
+1. **ภาพดีพอหรือยัง** แสงแบบไหนทำให้แยกชิ้นงานออกจากพื้นได้ง่ายและคงที่
+2. **เร็วพอหรือยัง** ระบบรับและประมวลผลภาพได้กี่ภาพต่อวินาที ช้ากว่าเหตุการณ์จริงเท่าไร และชิ้นงานเคลื่อนเร็วได้แค่ไหนก่อนภาพจะเบลอ
+
+```text
+Light setup -> locked exposure -> histogram -> threshold    (ส่วนที่ 1)
+Camera -> fps, latency                                     (ส่วนที่ 2)
+Moving part -> blur (pixel) -> max speed -> parts/min       (ส่วนที่ 3)
+```
+
+**เมื่อจบใบงาน** นักศึกษาควรสามารถ
+
+- เลือกการจัดแสงให้เหมาะกับงาน และวัด contrast และ noise ของภาพ
+- อ่าน histogram และใช้ threshold แบบกำหนดเองกับแบบ Otsu
+- วัดอัตราเฟรม ความหน่วงเวลา และเวลาประมวลผลต่อภาพ
+- คำนวณความเร็วสูงสุดของชิ้นงานจาก motion blur
+
+**อุปกรณ์:** ของที่หาได้ในสำนักงานทั้งหมด
+
+- กล้องพร้อมขาตั้ง (โทรศัพท์เครื่องที่ 1 หรือ USB webcam)
+- โทรศัพท์หรือแท็บเล็ตเครื่องที่ 2 ใช้เป็นไฟฉายและ backlight, กระดาษ A4 สีขาว
+- กล่องกระดาษ (เช่น กล่องกระดาษ A4) บุด้านในด้วยกระดาษขาว เจาะรูด้านบนให้กล้องมองลง
+- ชิ้นงาน 3 ชนิด: **ลวดเสียบกระดาษ** (โลหะมันวาว), **คลิปหนีบกระดาษสีดำ** (สองวัสดุ), **ไม้บรรทัดพลาสติกใส** (โปร่งใส)
+- แถบกระดาษที่พิมพ์จุดดำขนาด 10 mm จาก `data/motion_strip.pdf` (พิมพ์ขนาดจริง 100%)
+
+## ส่วนที่ 1: แสง
+
+### ล็อกค่ากล้อง
+
+กล้องส่วนใหญ่ปรับ exposure และ white balance เองตลอดเวลา ภาพของชิ้นงานเดียวกันจึงเปลี่ยนไปเมื่อมีคนเดินผ่านหรือเมื่อชิ้นงานสีเข้มเข้ามาในภาพ ระบบตรวจในโรงงาน **ล็อกค่ากล้องเสมอ**
+
+```python
+import cv2
+
+cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)        # Windows: DirectShow backend
+cap.set(cv2.CAP_PROP_SETTINGS, 1)               # opens the driver's settings dialog
+```
+
+บน Windows คำสั่งนี้เปิดหน้าต่างตั้งค่าของกล้อง ให้ยกเลิก Auto ของ Exposure และ White Balance แล้วตั้งค่าเอง ถ้าใช้ IP Webcam ให้เปิดหน้าเว็บของแอปแล้วเลือก exposure lock และ white balance lock (ถ้าแอปรุ่นนั้นมี)
+
+### จัดแสง 3 แบบด้วยโทรศัพท์
+
+โรงงานใช้ไฟสำหรับงานภาพโดยเฉพาะ แต่หลักการจัดแสงทำได้ด้วยไฟฉายและจอของโทรศัพท์เครื่องที่ 2
+
+| แบบ | วิธีจัด | เด่นเรื่อง |
+| --- | --- | --- |
+| ไฟห้อง | ไฟเพดานตามปกติ ชิ้นงานวางบนกระดาษขาว | ไม่ต้องเตรียม แต่มีเงาและจุดสะท้อนบนโลหะ |
+| แสงกระจาย (diffuse) | ครอบชิ้นงานด้วยกล่อง สอดโทรศัพท์เครื่องที่ 2 เข้าข้างกล่อง เปิดไฟฉายส่อง **เข้าผนังกล่อง** ไม่ส่องที่ชิ้นงานตรง ๆ | แสงสะท้อนผนังมาจากทุกทิศ จุดสะท้อนบนโลหะหายไป เห็นรายละเอียดผิว |
+| ส่องหลัง (backlight) | วางโทรศัพท์เครื่องที่ 2 หรือแท็บเล็ตราบ เปิดภาพสีขาวเต็มจอ ความสว่างสูงสุด วางกระดาษ A4 ทับจอ 1 แผ่น แล้ววางชิ้นงานบนกระดาษ ปิดไฟห้อง | ได้ภาพเงาดำบนพื้นสว่าง ขอบคมที่สุด ไม่สนใจสีและผิวของชิ้นงาน เหมาะกับงานวัดขนาด |
+
+::: {.callout-tip}
+## ทำไมต้องวางกระดาษทับจอ
+ถ้ากล้องอยู่ใกล้จอ จะเห็นลายเม็ด pixel ของจอเป็นตาราง กระดาษช่วยกระจายแสงให้เรียบ ถ้าต้องการพื้นที่ใหญ่กว่าจอ ทำโต๊ะแสงเองได้: วางกระจกกรอบรูปบนหนังสือ 2 กอง ปูกระดาษขาวบนกระจก แล้วส่องไฟฉายจากใต้กระจก
+:::
+
+::: {.callout-warning}
+## อย่าใช้ไฟฉายของโทรศัพท์เครื่องที่เป็นกล้อง
+ไฟฉายอยู่ข้างเลนส์ แสงจึงสะท้อนจากโลหะกลับเข้าเลนส์ตรง ๆ ลองเปิดดู 1 ภาพเพื่อเห็นว่าเกิดอะไรขึ้น แล้วปิด
+:::
+
+### ถ่ายชิ้นงานใต้แสงแต่ละแบบ
+
+วางชิ้นงานทั้ง 3 ชนิดในภาพพร้อมกัน แล้วถ่ายภาพใต้แสงทั้ง 3 แบบ โดยไม่ขยับกล้องและชิ้นงาน วัด contrast ของชิ้นงานแต่ละชนิดด้วยโค้ดนี้
+
+```python
+import numpy as np
+
+ret, frame = cap.read()
+gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+obj = cv2.selectROI("Select OBJECT", gray)          # drag a box on the part, press Enter
+bg = cv2.selectROI("Select BACKGROUND", gray)       # drag a box on the background
+cv2.destroyAllWindows()
+
+def mean_in(roi):
+    x, y, w, h = roi
+    return gray[y:y + h, x:x + w].mean()
+
+I_obj, I_bg = mean_in(obj), mean_in(bg)
+contrast = abs(I_bg - I_obj) / (I_bg + I_obj)
+print(f"object {I_obj:.0f}, background {I_bg:.0f}, contrast {contrast:.2f}")
+```
+
+**noise** คือความผันผวนของค่า pixel เดียวกันเมื่อถ่ายซ้ำโดยไม่มีอะไรเปลี่ยน วัดจาก 30 ภาพต่อเนื่อง
+
+```python
+stack = []
+for i in range(30):
+    ret, frame = cap.read()
+    stack.append(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).astype(np.float32))
+noise = np.std(np.array(stack), axis=0).mean()      # mean S.D. over all pixels
+print(f"noise = {noise:.2f} gray levels")
+```
+
+| แสง | contrast ลวดเสียบกระดาษ | contrast คลิปดำ (ตัวคลิป / ขาโลหะ) | contrast ไม้บรรทัดใส | noise | Otsu threshold |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| ไฟห้อง | | / | | | |
+| แสงกระจาย | | / | | | |
+| backlight | | / | | | |
+
+### แสงมุมต่ำสำหรับวัตถุใส
+
+ไม้บรรทัดใสแทบหายไปใน backlight เพราะแสงผ่านได้ ให้ลองอีกแบบ: ปิดไฟห้อง วางโทรศัพท์เครื่องที่ 2 ราบกับโต๊ะห่างชิ้นงานประมาณ 20 cm เปิดไฟฉายให้แสง **ส่องเฉียดผิวโต๊ะ** แสงที่กระทบขอบและรอยขีดจะสะท้อนขึ้นกล้อง ขอบไม้บรรทัดจึงสว่างบนพื้นมืด (low-angle หรือ dark-field lighting ซึ่งโรงงานใช้หารอยขีดบนผิว)
+
+| แสง | contrast ขอบไม้บรรทัดใส |
+| :--- | :--- |
+| แสงมุมต่ำ | |
+
+### histogram และ threshold
+
+**histogram** นับว่ามี pixel ที่ระดับความสว่าง 0–255 อย่างละกี่ตัว ภาพที่แยกชิ้นงานกับพื้นได้ดีจะมี 2 ยอดห่างกันชัด แล้ว threshold ที่อยู่ระหว่างสองยอดจะแยกได้ทั้งภาพ
+
+```python
+hist = cv2.calcHist([gray], [0], None, [256], [0, 256]).ravel()
+
+canvas = np.full((200, 256), 255, np.uint8)         # draw the histogram
+for v in range(256):
+    h = int(190 * hist[v] / hist.max())
+    cv2.line(canvas, (v, 199), (v, 199 - h), 0)
+
+t_otsu, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+print("Otsu threshold =", t_otsu)
+
+cv2.imshow("Histogram", canvas)
+cv2.imshow("Binary (Otsu)", binary)
+cv2.waitKey(0)
+```
+
+**Otsu** เลือก threshold ให้เองโดยหาค่าที่แบ่ง pixel เป็น 2 กลุ่มที่ต่างกันมากที่สุด ทดลองแทน `0` และ `THRESH_OTSU` ด้วยค่าคงที่ เช่น `cv2.threshold(gray, 100, 255, cv2.THRESH_BINARY_INV)` แล้วเปิด-ปิดไฟห้องเพื่อดูว่าค่าคงที่ยังใช้ได้หรือไม่
+
+::: {.callout-note}
+## คำถาม
+1. ภายใต้ไฟห้อง threshold ค่าเดียวแยกลวดเสียบกระดาษได้ครบทั้งชิ้นหรือไม่ จุดสะท้อนทำให้เกิดอะไรกับภาพ binary
+2. คลิปดำมีสองวัสดุ แสงแบบใดทำให้ทั้งชิ้นกลายเป็นบริเวณเดียวกัน
+3. สรุปเป็นตาราง: ชิ้นงานโลหะมันวาว ชิ้นงานหลายวัสดุ และชิ้นงานใส ควรใช้แสงแบบใด เพราะอะไร
+4. ถ้าแสงในโรงงานเปลี่ยนตลอดวัน ควรแก้ด้วยโค้ด (เช่น Otsu) หรือด้วยการจัดแสง เพราะอะไร
+:::
+
+## ส่วนที่ 2: อัตราเฟรมและความหน่วงเวลา
+
+ระบบภาพแบบเวลาจริงมีค่าเวลา 3 ค่าที่ต้องแยกกันให้ออก
+
+- **อัตราเฟรม** $f$ (fps) คือจำนวนภาพที่โปรแกรมได้รับต่อวินาที
+- **เวลาประมวลผล** $t_{\mathrm{proc}}$ คือเวลาที่โค้ดตรวจสอบใช้ต่อภาพ
+- **ความหน่วงเวลา** (latency) คือเวลาตั้งแต่เหตุการณ์เกิดจริงจนโปรแกรมได้ภาพนั้น
+
+### วัดอัตราเฟรมและเวลาประมวลผล
+
+```python
+import time
+
+N = 100
+t0 = time.perf_counter()
+for i in range(N):
+    ret, frame = cap.read()
+t1 = time.perf_counter()
+print(f"capture: {N / (t1 - t0):.1f} fps")
+
+t_proc = []
+for i in range(N):
+    ret, frame = cap.read()
+    t = time.perf_counter()
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)          # the inspection to time
+    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    t_proc.append(time.perf_counter() - t)
+print(f"processing: {1000 * np.mean(t_proc):.2f} ms per frame")
+```
+
+เปลี่ยนส่วนที่จับเวลาเป็น `model(frame, verbose=False)` ของ YOLO จากใบงาน 1 แล้วเทียบ
+
+| รายการ | ครั้งที่ 1 | ครั้งที่ 2 | ครั้งที่ 3 | เฉลี่ย |
+| :--- | :--- | :--- | :--- | :--- |
+| อัตราเฟรมของกล้อง (fps) | | | | |
+| เวลาประมวลผล threshold (ms) | | | | |
+| เวลาประมวลผล YOLO (ms) | | | | |
+
+### วัดความหน่วงเวลา
+
+แสดงนาฬิกาความละเอียด millisecond บนจอคอมพิวเตอร์ หันกล้องไปถ่ายนาฬิกานั้น และเขียนเวลาที่โปรแกรมได้รับภาพทับลงบนภาพ ภาพที่บันทึกจึงมีเวลา 2 ค่า
+
+$$
+\text{latency} = t_{\mathrm{pc}} - t_{\mathrm{cam}}
+$$
+
+```python
+def now_ms():
+    return int(time.perf_counter() * 1000) % 100000     # 5-digit ms clock
+
+while True:
+    ret, frame = cap.read()
+
+    clock = np.zeros((150, 600, 3), np.uint8)           # big clock: point the camera here
+    cv2.putText(clock, f"{now_ms():05d}", (20, 110),
+                cv2.FONT_HERSHEY_SIMPLEX, 3.5, (255, 255, 255), 6)
+    cv2.imshow("Clock", clock)
+
+    cv2.putText(frame, f"PC {now_ms():05d}", (10, 40),  # time the frame arrived
+                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+    cv2.imshow("Camera", frame)
+
+    key = cv2.waitKey(1) & 0xFF
+    if key == ord('s'):
+        cv2.imwrite(f"latency_{now_ms()}.jpg", frame)   # read both times later
+    elif key == ord('q'):
+        break
+```
+
+บันทึก 5 ภาพ แล้วอ่าน $t_{\mathrm{cam}}$ (เลขบนนาฬิกาที่กล้องถ่ายไว้) และ $t_{\mathrm{pc}}$ (เลขสีแดง)
+
+| ภาพที่ | 1 | 2 | 3 | 4 | 5 | เฉลี่ย | S.D. |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| $t_{\mathrm{cam}}$ | | | | | | | |
+| $t_{\mathrm{pc}}$ | | | | | | | |
+| latency (ms) | | | | | | | |
+
+::: {.callout-note}
+## คำถาม
+fps สูงแปลว่า latency ต่ำเสมอหรือไม่ อธิบายพร้อมตัวอย่างจากผลการทดลอง (ถ้าใช้ IP camera ให้เทียบแบบ stream กับ snapshot)
+:::
+
+## ส่วนที่ 3: ชิ้นงานเคลื่อนที่
+
+### วัด motion blur
+
+ระหว่างที่ชัตเตอร์เปิดนาน $t_{\mathrm{exp}}$ ชิ้นงานเคลื่อนไปได้ระยะหนึ่ง ภาพจึงยืดออกเป็นแถบเบลอ ถ้าเบลอเกิน 1–2 pixel ขอบชิ้นงานจะไม่คม และการวัดขนาดจะผิด
+
+ดึงแถบกระดาษที่มีจุดดำผ่านกล้องด้วยความเร็วคงที่ บันทึกวิดีโอ แล้วใช้โปรแกรมคลิกวัดระยะบนภาพ
+
+```python
+import math
+
+cap = cv2.VideoCapture("strip.mp4")         # or the camera
+fps = cap.get(cv2.CAP_PROP_FPS)
+frames = []
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+    frames.append(frame)
+
+clicks = []
+def on_click(event, x, y, flags, param):
+    if event == cv2.EVENT_LBUTTONDOWN:
+        clicks.append((x, y))
+        if len(clicks) % 2 == 0:
+            (xa, ya), (xb, yb) = clicks[-2:]
+            print(f"distance = {math.hypot(xb - xa, yb - ya):.1f} pixel")
+
+i = 0
+cv2.namedWindow("Frame")
+cv2.setMouseCallback("Frame", on_click)
+while True:
+    cv2.imshow("Frame", frames[i])
+    key = cv2.waitKey(0) & 0xFF                 # d = next frame, a = previous, q = quit
+    if key == ord('d'):
+        i = min(i + 1, len(frames) - 1)
+    elif key == ord('a'):
+        i = max(i - 1, 0)
+    elif key == ord('q'):
+        break
+print("fps =", fps)
+```
+
+วัด 3 ค่าจากวิดีโอ
+
+- $L_{\mathrm{px}}$ ความยาวของจุดที่เบลอตามแนวการเคลื่อนที่ และ $D_{\mathrm{px}}$ ขนาดของจุดตอนหยุดนิ่ง ได้ blur $b = L_{\mathrm{px}} - D_{\mathrm{px}}$
+- $\Delta x$ ระยะที่จุดเลื่อนไประหว่าง 2 frame ติดกัน (pixel/frame)
+- $k$ จาก $D_{\mathrm{px}}$ กับขนาดจริง 10 mm
+
+ชิ้นงานเลื่อน $\Delta x$ pixel ในเวลา $1/f$ และเลื่อน $b$ pixel ระหว่างที่ชัตเตอร์เปิด จึงได้
+
+$$
+t_{\mathrm{exp}} = \frac{b}{\Delta x \, f}
+\qquad
+v = \Delta x \, f \, k
+\qquad
+v_{\max} = \frac{b_{\max} \, k}{t_{\mathrm{exp}}}
+$$
+
+โดย $b_{\max}$ คือ blur ที่ยอมรับได้ (ใช้ 1 pixel)
+
+| ครั้งที่ | $D_{\mathrm{px}}$ | $L_{\mathrm{px}}$ | $b$ | $\Delta x$ | $f$ | $t_{\mathrm{exp}}$ (ms) | $v$ (mm/s) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| ดึงช้า | | | | | | | |
+| ดึงเร็ว | | | | | | | |
+
+::: {.callout-note}
+## แถบมืดสว่างพาดภาพ
+จอโทรศัพท์และหลอด LED บางชนิดหรี่แสงด้วยการกะพริบเร็ว (PWM) เมื่อ exposure สั้นกว่ารอบการกะพริบ กล้องจะเห็นแถบมืดสว่างพาดภาพ ถ้าพบ ให้ตั้งความสว่างจอสูงสุด (มักไม่กะพริบ) หรือใช้แสงกระจายจากไฟฉายแทน
+:::
+
+### ระบบตรวจได้กี่ชิ้นต่อนาที
+
+ระบบต้องตรวจชิ้นงานให้ทันทุกชิ้น จึงถูกจำกัดด้วยค่าที่ช้าที่สุดระหว่างการรับภาพกับการประมวลผล
+
+$$
+f_{\mathrm{proc}} = \min\left(f, \frac{1}{t_{\mathrm{proc}}}\right)
+\qquad
+\text{ชิ้นต่อนาที} \le 60 \, f_{\mathrm{proc}}
+$$
+
+::: {.callout-note}
+## คำถาม
+1. จากผลของคุณ ชิ้นงานบนสายพานเคลื่อนเร็วได้สูงสุดกี่ mm/s และระบบตรวจได้สูงสุดกี่ชิ้นต่อนาที ถ้าใช้ threshold และถ้าใช้ YOLO
+2. ถ้าต้องเป่าลมคัดชิ้นงานเสียออกที่จุดห่างจากกล้อง 300 mm ความหน่วงเวลาที่วัดได้กำหนดความเร็วสายพานอย่างไร
+3. ถ้าต้องการให้สายพานเร็วขึ้นโดยภาพไม่เบลอ ต้องเปลี่ยนอะไร และต้องแลกกับอะไร (เช่น ลด exposure แล้วภาพมืด ต้องเพิ่มแสง)
+:::
+
+## ทบทวน
+
+- ล็อก exposure และ white balance ก่อนตั้งค่าใด ๆ ในโค้ด
+- แสงที่ดีแก้ปัญหาได้มากกว่าโค้ด และต้องเลือกตามชิ้นงาน: backlight ให้ขอบคมที่สุดสำหรับงานวัดขนาดและชิ้นงานหลายวัสดุ แสงกระจายลดจุดสะท้อนบนโลหะ แสงมุมต่ำเห็นขอบของวัตถุใสและรอยขีด
+- จอโทรศัพท์ที่เปิดภาพขาวใช้เป็น backlight ได้ และไฟฉายโทรศัพท์ใช้ทำแสงกระจายหรือแสงมุมต่ำได้
+- histogram ที่มี 2 ยอดแยกชัดคือสัญญาณว่า threshold ค่าเดียวจะใช้ได้ Otsu หาค่านั้นให้อัตโนมัติ
+- fps, เวลาประมวลผล และ latency เป็นคนละค่ากัน ต้องวัดแยก
+- exposure กำหนด motion blur และ blur กำหนดความเร็วสูงสุดของชิ้นงาน

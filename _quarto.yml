@@ -1,0 +1,88 @@
+project:
+  type: website
+  render:
+    - index.qmd
+    - content/*.qmd
+  resources:
+    - data/**
+
+website:
+  title: "CV for Beginners"
+  site-url: https://vsupacha.github.io/cv-for-beginners/
+  repo-url: https://github.com/vsupacha/cv-for-beginners
+  navbar:
+    logo: content/figs/TSE_logo.svg
+    left:
+      - href: index.qmd
+        text: หน้าแรก
+      - text: ใบงาน
+        menu:
+          - href: content/00_setup.qmd
+            text: "0 เตรียมเครื่องมือ"
+          - href: content/01_counting.qmd
+            text: "1 นับวัตถุด้วย AI"
+          - href: content/02_camera_sensor.qmd
+            text: "2 กล้องในฐานะเซนเซอร์"
+          - href: content/03_light_time.qmd
+            text: "3 แสง เวลา และการรับภาพ"
+          - href: content/04_inspection.qmd
+            text: "4 ตรวจสอบชิ้นงาน OK/NG"
+          - href: content/05_gauging.qmd
+            text: "5 วัดขนาดและสถานีตรวจ"
+      - href: content/concepts.qmd
+        text: แนวคิดพื้นฐาน
+      - text: ผู้สอน
+        menu:
+          - href: content/instructor_setup.qmd
+            text: เตรียมอุปกรณ์และแผ่นทดสอบ
+    right:
+      - icon: github
+        href: https://github.com/vsupacha/cv-for-beginners
+  sidebar:
+    style: docked
+    search: true
+    contents:
+      - index.qmd
+      - section: "ใบงาน"
+        contents:
+          - content/00_setup.qmd
+          - content/01_counting.qmd
+          - content/02_camera_sensor.qmd
+          - content/03_light_time.qmd
+          - content/04_inspection.qmd
+          - content/05_gauging.qmd
+      - section: "อ้างอิง"
+        contents:
+          - content/concepts.qmd
+          - content/troubleshooting.qmd
+          - content/extras.qmd
+      - section: "สำหรับผู้สอน"
+        contents:
+          - content/instructor_setup.qmd
+  page-footer:
+    center: "CV for Beginners · ภาควิชาวิศวกรรมไฟฟ้าและคอมพิวเตอร์ คณะวิศวกรรมศาสตร์ มหาวิทยาลัยธรรมศาสตร์"
+
+format:
+  html:
+    theme: cosmo
+    lang: th
+    toc: true
+    toc-title: "ในหน้านี้"
+    code-copy: true
+    code-line-numbers: false
+    number-sections: false
+    smooth-scroll: true
+    html-math-method: katex
+    mermaid:
+      theme: default
+    mainfont: "Noto Sans Thai"
+    monofont: "JetBrains Mono"
+    include-in-header:
+      text: |
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    css: content/style.css
+
+author: "ผศ.ดร.ศุภชัย วรพจน์พิศุทธิ์"
+date: 2026-10-15
+date-format: long

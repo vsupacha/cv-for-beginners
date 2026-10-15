@@ -1,0 +1,15 @@
+**/__pycache__/
+*.pyc
+.venv/
+# ผลลัพธ์ของ Quarto
+_site/
+.quarto/
+*_files/
+**/*.quarto_ipynb
+# ไฟล์ที่โปรแกรมสร้างระหว่างทำใบงาน
+code/**/out_*
+code/**/*.pt
+code/**/runs/
+*_key.pdf
+
+/.quarto/

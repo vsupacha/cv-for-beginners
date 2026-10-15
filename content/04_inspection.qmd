@@ -1,0 +1,221 @@
+---
+title: "4 ตรวจสอบชิ้นงาน OK/NG"
+subtitle: "หาตำแหน่งถาดด้วย ArUco ตรวจว่าชิ้นงานครบและไม่มีคราบ แล้ววัดว่าเครื่องตรวจตัดสินผิดบ่อยแค่ไหน"
+---
+
+<div class="chain"><span>Scene + Camera</span><span class="on">Pixels</span><span class="on">Features</span><span class="on">Measurand</span><span class="on">Calibration</span><span class="on">Uncertainty</span><span class="on">Decision</span></div>
+
+## โจทย์
+
+สายบรรจุต้องตรวจว่าถาดแต่ละใบมี **ชิ้นงานครบ 20 ช่อง** และ **ไม่มีคราบบนถาด** ก่อนปิดกล่อง ปัญหาแรกคือถาดไม่เคยวางตรงที่เดิม ถ้ากำหนดตำแหน่งช่องเป็น pixel ตายตัว เมื่อถาดเลื่อนหรือกล้องเอียง ช่องจะไม่ตรงทันที (ปัญหาเดียวกับตารางสุดท้ายของใบงาน 2)
+
+```text
+4 ArUco markers -> homography -> top view -> fixed ROI     (ส่วนที่ 1)
+ROI -> dark ratio / difference from golden -> OK/NG       (ส่วนที่ 2)
+30 test images -> confusion matrix -> FRR, FAR             (ส่วนที่ 3)
+```
+
+**เมื่อจบใบงาน** นักศึกษาควรสามารถ
+
+- หาตำแหน่งชิ้นงานจาก marker และแปลงภาพเป็นมุมมองด้านบนด้วย perspective transform
+- ตรวจการมี/ไม่มีของชิ้นงานใน ROI และหาตำหนิด้วยผลต่างจากภาพต้นแบบ (golden image)
+- ประเมินเครื่องตรวจด้วย confusion matrix, FRR และ FAR และเลือกเกณฑ์ตัดสิน
+
+**อุปกรณ์:** กล้องพร้อมขาตั้ง, แผ่นถาด `data/tray_sheet.pdf` (พิมพ์ขนาดจริง 100%), ชิ้นงานกลมสีเข้มเส้นผ่านศูนย์กลางประมาณ 20 mm จำนวน 20 ชิ้น (เหรียญ 1 บาท หรือกระดุม), ดินสอหรือกระดาษสีเข้มเล็ก ๆ ทำ "คราบ"
+
+::: {.callout-tip}
+## ไม่มีกล้อง?
+ใช้ภาพใน `data/04_tray/ok` (ถาดดี 15 ภาพ) และ `data/04_tray/ng` (ถาดเสีย 15 ภาพ) ได้ทั้งใบงาน
+:::
+
+## ส่วนที่ 1: หาตำแหน่งถาด
+
+### ArUco marker
+
+**ArUco** คือสี่เหลี่ยมขาวดำที่มีรหัสอยู่ข้างใน OpenCV หาตำแหน่งมุมทั้ง 4 ของ marker และอ่านหมายเลขได้แม่นยำ โรงงานใช้ marker หรือจุดอ้างอิง (fiducial) แบบนี้บนถาด แผ่น PCB และโต๊ะหุ่นยนต์ แผ่นถาดของใบงานนี้มี marker หมายเลข 0–3 ที่มุมซ้ายบน ขวาบน ขวาล่าง และซ้ายล่าง
+
+```python
+import cv2
+import numpy as np
+
+detector = cv2.aruco.ArucoDetector(cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50))
+
+img = cv2.imread("data/04_tray/ok/ok_00.jpg")       # or a frame from the camera
+corners, ids, _ = detector.detectMarkers(img)
+print("found ids:", ids.ravel())
+
+view = img.copy()                                   # draw on a copy, keep img clean
+cv2.aruco.drawDetectedMarkers(view, corners, ids)
+cv2.imshow("Markers", view)
+cv2.waitKey(0)
+```
+
+### แปลงเป็นมุมมองด้านบน
+
+เรารู้ตำแหน่งจริงของจุดกึ่งกลาง marker บนแผ่นพิมพ์ (หน่วย mm) และรู้ตำแหน่งในภาพ (หน่วย pixel) สี่คู่จุดนี้พอสำหรับหา **homography** ซึ่งเป็นเมทริกซ์ 3 x 3 ที่แปลงระนาบเอียงในภาพให้เป็นภาพมองตรงจากด้านบน
+
+```python
+S = 2                                                   # pixel per mm in the top view
+MARKER_MM = {0: (30, 30), 1: (267, 30), 2: (267, 180), 3: (30, 180)}   # centers on the sheet
+W, H = (267 - 30) * S, (180 - 30) * S                   # top view size (pixel)
+
+def top_view(img):
+    corners, ids, _ = detector.detectMarkers(img)
+    if ids is None:
+        return None
+    found = {int(i): c[0].mean(axis=0) for i, c in zip(ids.ravel(), corners)}   # id -> center
+    if not all(k in found for k in MARKER_MM):
+        return None                                     # need all 4 markers
+    src = np.float32([found[k] for k in range(4)])
+    dst = np.float32([((x - 30) * S, (y - 30) * S) for x, y in (MARKER_MM[k] for k in range(4))])
+    M = cv2.getPerspectiveTransform(src, dst)
+    return cv2.warpPerspective(img, M, (W, H))
+
+top = top_view(img)
+cv2.imshow("Top view", top)
+cv2.waitKey(0)
+```
+
+ในภาพ top view ทุก 1 pixel เท่ากับ 0.5 mm ทั่วทั้งภาพ ไม่ว่าถาดจะวางเอียงแค่ไหน ตำแหน่งของช่องจึงคำนวณจากแบบของแผ่นได้โดยตรง
+
+```python
+CELLS_MM = [(148.5 + (c - 2) * 40, 105 + (r - 1.5) * 40) for r in range(4) for c in range(5)]
+CELLS = [(int((x - 30) * S), int((y - 30) * S)) for x, y in CELLS_MM]     # in the top view
+
+for i, (cx, cy) in enumerate(CELLS):
+    cv2.circle(top, (cx, cy), 9 * S, (0, 0, 255), 2)
+    cv2.putText(top, str(i), (cx - 8, cy + 6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+```
+
+ทดลองเลื่อนและหมุนถาด (หรือเปิดภาพหลายภาพ) แล้วดูว่าวงกลมสีแดงยังตรงช่องหรือไม่
+
+| ทดลอง | พบ marker ครบ 4 ตัว | วงกลมตรงช่องทุกช่อง |
+| :--- | :--- | :--- |
+| ถาดตรง กลางภาพ | | |
+| หมุนถาด 20 องศา | | |
+| เอียงกล้อง 20 องศา | | |
+| เอานิ้วบัง marker 1 ตัว | | |
+
+## ส่วนที่ 2: ตรวจถาด
+
+### มีชิ้นงานหรือไม่
+
+ในแต่ละช่อง นับสัดส่วน pixel ที่มืดกว่า threshold ภายในวงกลม ถ้ามีชิ้นงานสีเข้ม สัดส่วนจะสูง
+
+```python
+def dark_ratio(gray, cx, cy, r=9 * S, t=128):
+    m = np.zeros_like(gray)
+    cv2.circle(m, (cx, cy), r, 255, -1)
+    return np.mean(gray[m == 255] < t)          # 0..1
+
+gray = cv2.cvtColor(top, cv2.COLOR_BGR2GRAY)
+ratios = [dark_ratio(gray, cx, cy) for cx, cy in CELLS]
+present = [______________ for r in ratios]      # True when a part is in the cell
+print("parts:", sum(present), "/", len(CELLS))
+```
+
+| ภาพ | ช่องว่างจริง | ช่องว่างที่ตรวจพบ | dark ratio ต่ำสุดของช่องที่มีของ | dark ratio สูงสุดของช่องว่าง |
+| :--- | :--- | :--- | :--- | :--- |
+| ok_00 | ไม่มี | | | |
+| ng_00 | | | | |
+| ng_01 | | | | |
+
+### มีคราบหรือไม่: เทียบกับภาพต้นแบบ
+
+**golden image** คือภาพ top view ของถาดที่ดี ภาพที่ตรวจจะถูกลบกับภาพนี้ทีละ pixel (`cv2.absdiff`) บริเวณที่ต่างกันมากคือสิ่งที่ไม่ควรมี เพราะทั้งสองภาพถูกจัดตำแหน่งด้วย marker แล้ว ลวดลายที่พิมพ์ไว้จะซ้อนกันพอดีและหักล้างกัน
+
+```python
+def prep(img):
+    g = cv2.cvtColor(top_view(img), cv2.COLOR_BGR2GRAY)
+    return cv2.GaussianBlur(g, (5, 5), 0)               # reduce pixel noise
+
+golden = prep(cv2.imread("data/04_tray/ok/ok_00.jpg"))
+
+# inspect only the tray surface: skip the cells (parts move a little) and the markers
+roi = np.full((H, W), 255, np.uint8)
+for cx, cy in CELLS:
+    cv2.circle(roi, (cx, cy), 14 * S, 0, -1)
+for x, y in [(0, 0), (W, 0), (W, H), (0, H)]:
+    cv2.rectangle(roi, (x - 18 * S, y - 18 * S), (x + 18 * S, y + 18 * S), 0, -1)
+
+def stain_area(img, t_diff=30):
+    g = prep(img)
+    g = cv2.convertScaleAbs(g, alpha=np.median(golden) / np.median(g))   # match brightness
+    diff = cv2.absdiff(g, golden)
+    diff[roi == 0] = 0
+    _, bw = cv2.threshold(diff, t_diff, 255, cv2.THRESH_BINARY)
+    contours, _ = cv2.findContours(bw, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    return max([cv2.contourArea(c) for c in contours], default=0)        # largest blob (pixel^2)
+```
+
+ทดลองเอาบรรทัดที่ลบช่องและ marker ออกจาก `roi` หรือเอาบรรทัดปรับความสว่างออก แล้วดูว่า `stain_area` ของถาดดีเปลี่ยนไปเท่าไร
+
+### ตัดสิน OK/NG
+
+```python
+MIN_STAIN = 20                                  # pixel^2 in the top view (1 pixel^2 = 0.25 mm^2)
+
+def inspect(img):
+    gray = cv2.cvtColor(top_view(img), cv2.COLOR_BGR2GRAY)
+    n_parts = sum(dark_ratio(gray, cx, cy) > 0.5 for cx, cy in CELLS)
+    area = stain_area(img)
+    ok = ______________________________          # all 20 parts and no stain
+    return ok, n_parts, area
+```
+
+## ส่วนที่ 3: เครื่องตรวจตัดสินผิดบ่อยแค่ไหน
+
+เครื่องตรวจผิดได้ 2 แบบ ซึ่งมีราคาต่างกัน
+
+| | เครื่องตัดสิน OK | เครื่องตัดสิน NG |
+| --- | --- | --- |
+| **ถาดดีจริง** | ถูก | **false reject** ของดีถูกคัดทิ้ง เสียเงินและเวลา |
+| **ถาดเสียจริง** | **false accept** ของเสียหลุดถึงลูกค้า เสียชื่อเสียง | ถูก |
+
+$$
+\mathrm{FRR} = \frac{\text{ถาดดีที่ถูกตัดสินเป็น NG}}{\text{ถาดดีทั้งหมด}}
+\qquad
+\mathrm{FAR} = \frac{\text{ถาดเสียที่ถูกตัดสินเป็น OK}}{\text{ถาดเสียทั้งหมด}}
+$$
+
+```python
+import glob
+
+def evaluate(min_stain):
+    global MIN_STAIN
+    MIN_STAIN = min_stain
+    fr = sum(not inspect(cv2.imread(f))[0] for f in glob.glob("data/04_tray/ok/*.jpg"))
+    fa = sum(inspect(cv2.imread(f))[0] for f in glob.glob("data/04_tray/ng/*.jpg"))
+    return fr / 15, fa / 15
+
+for t in [5, 10, 15, 20, 25, 30, 40]:
+    frr, far = evaluate(t)
+    print(f"MIN_STAIN = {t:3d}   FRR = {100 * frr:5.1f} %   FAR = {100 * far:5.1f} %")
+```
+
+| MIN_STAIN | 5 | 10 | 15 | 20 | 25 | 30 | 40 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| FRR (%) | | | | | | | |
+| FAR (%) | | | | | | | |
+
+เขียน confusion matrix ของเกณฑ์ที่เลือก
+
+| | ตัดสิน OK | ตัดสิน NG |
+| --- | --- | --- |
+| ถาดดีจริง (15) | | |
+| ถาดเสียจริง (15) | | |
+
+::: {.callout-note}
+## คำถาม
+1. เมื่อเพิ่ม `MIN_STAIN` ค่า FRR และ FAR เปลี่ยนไปอย่างไร ทำไมจึงลดทั้งสองค่าพร้อมกันไม่ได้
+2. ถ้าเป็นถาดยา (ของเสียหลุดไม่ได้) กับถาดขนม (ของดีทิ้งแพง) ควรเลือกเกณฑ์ต่างกันอย่างไร
+3. ถาดเสียที่เครื่องตรวจไม่พบมีลักษณะอย่างไร ควรแก้ที่แสง กล้อง หรือโค้ด
+4. ถ้าคราบมีได้หลายแบบมาก (สี รูปทรง ขนาดต่างกัน) จนเขียนกฎไม่ครบ ควรเปลี่ยนไปใช้ AI แบบใบงาน 1 หรือไม่ ต้องเตรียมอะไรบ้าง
+:::
+
+## ทบทวน
+
+- marker หรือจุดอ้างอิงทำให้หาตำแหน่งชิ้นงานได้แม่นยำ และ homography แปลงภาพเอียงเป็นภาพด้านบนที่มีสเกล mm เท่ากันทั้งภาพ
+- เมื่อภาพถูกจัดตำแหน่งแล้ว ROI ที่กำหนดจากแบบของชิ้นงานจะใช้ได้ทุกภาพ
+- presence/absence ใช้สัดส่วน pixel ใน ROI ส่วนตำหนิหาได้จากผลต่างกับ golden image
+- เครื่องตรวจทุกเครื่องผิดได้ ต้องรายงาน FRR และ FAR และเลือกเกณฑ์ตามราคาของความผิดแต่ละแบบ

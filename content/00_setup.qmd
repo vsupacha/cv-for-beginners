@@ -1,0 +1,88 @@
+---
+title: "0 เตรียมเครื่องมือ"
+subtitle: "ติดตั้ง Python และ OpenCV แล้วต่อกล้องให้ได้ภาพแรก"
+---
+
+## ติดตั้งไลบรารี
+
+ต้องมี Python 3.10 ขึ้นไป เปิดเทอร์มินัลแล้วพิมพ์
+
+```bash
+pip install opencv-contrib-python numpy ultralytics pyserial
+```
+
+| ไลบรารี | ใช้ทำอะไร | ใบงาน |
+| --- | --- | --- |
+| `opencv-contrib-python` | อ่านภาพ ประมวลผลภาพ ArUco สอบเทียบกล้อง | ทุกใบ |
+| `numpy` | ภาพใน OpenCV คือ NumPy array | ทุกใบ |
+| `ultralytics` | โมเดล YOLO | 1, 3 |
+| `pyserial` | ส่งผล OK/NG ไปบอร์ด Arduino | 5 |
+
+::: {.callout-warning}
+## ติดตั้ง OpenCV เพียงแพ็กเกจเดียว
+ถ้าเคยติดตั้ง `opencv-python` ไว้แล้ว ให้ถอนออกก่อน (`pip uninstall opencv-python`) เพราะสองแพ็กเกจนี้ชนกัน `opencv-contrib-python` มีทุกอย่างของ `opencv-python` และมีโมดูลเพิ่มเติม
+:::
+
+ตรวจสอบการติดตั้ง
+
+```python
+import cv2
+import numpy as np
+print(cv2.__version__, np.__version__)
+print(hasattr(cv2, "aruco"))     # True = ready for worksheet 4
+```
+
+## ต่อกล้อง
+
+ทุกใบงานเปิดกล้องด้วยคำสั่งเดียวกัน `cv2.VideoCapture(SOURCE)` ต่างกันแค่ค่า `SOURCE`
+
+| กล้อง | ค่า `SOURCE` | หมายเหตุ |
+| --- | --- | --- |
+| USB webcam หรือกล้องในโน้ตบุ๊ก | `0` (ตัวที่สองคือ `1`) | latency ต่ำ ล็อก exposure ได้ง่าย |
+| IP Webcam (Android) | `"http://192.168.1.50:8080/video"` | วิธีตั้งค่าอยู่ใน[ใบงาน 2](02_camera_sensor.qmd#sec-ipcam) |
+| DroidCam (Android/iOS) | `"http://192.168.1.50:4747/video"` | |
+| ไฟล์วิดีโอ | `"data/road_03.mp4"` | ใช้แทนกล้องได้ทุกใบงาน |
+
+```python
+import cv2
+
+SOURCE = 0                      # 0 = USB webcam, or an IP camera URL, or a video file
+
+cap = cv2.VideoCapture(SOURCE)
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        print("Failed to grab frame")
+        break
+    cv2.imshow("Camera", frame)
+    if cv2.waitKey(1) & 0xFF == ord('q'):    # press q to stop
+        break
+
+cap.release()
+cv2.destroyAllWindows()
+```
+
+::: {.callout-tip}
+## ลองดู
+พิมพ์ `frame.shape` ในลูป แล้วตอบว่ากล้องของคุณให้ภาพขนาดเท่าไร และมีกี่ channel
+:::
+
+## ทำงานเป็นกลุ่ม
+
+ทำแลปกลุ่มละ 2–3 คน แต่ละใบงานมี 3 ส่วน ให้ **หมุนหน้าที่ทุกส่วน** ทุกคนจะได้เขียนโค้ดอย่างน้อยหนึ่งส่วนในทุกใบงาน
+
+| หน้าที่ | ทำอะไร |
+| --- | --- |
+| ผู้เขียนโค้ด | พิมพ์และรันโค้ด เติมช่อง `______` |
+| ผู้จัดฉาก | จัดกล้อง แสง และชิ้นงาน วัดค่าอ้างอิงด้วยเวอร์เนียร์หรือนับเอง |
+| ผู้บันทึก | กรอกตาราง ตรวจว่าค่าสมเหตุสมผล และร่างคำตอบ |
+
+กลุ่ม 2 คนรวมผู้จัดฉากกับผู้บันทึกเป็นคนเดียว
+
+**ของที่กลุ่มต้องเตรียมเอง:** โน้ตบุ๊ก 1 เครื่อง (2 เครื่องยิ่งดี), โทรศัพท์ 2 เครื่อง (เครื่องหนึ่งเป็นกล้อง อีกเครื่องเป็นไฟฉายและ backlight), สายชาร์จหรือ power bank เพราะโทรศัพท์ที่เปิดกล้องและ Wi-Fi ทั้งคาบจะแบตหมดเร็วและร้อน
+
+## รันโค้ดอย่างไร
+
+เขียนโค้ดเป็นไฟล์ `.py` แล้วรันจากเทอร์มินัล (`python count.py`) หรือกด Run ใน VS Code หน้าต่าง `cv2.imshow` ต้องการโปรแกรมที่รันบนเครื่องจริง จึงใช้กับ Google Colab หรือ Jupyter บนเว็บไม่ได้
+
+หากติดปัญหา ดู[แก้ปัญหาที่พบบ่อย](troubleshooting.qmd)

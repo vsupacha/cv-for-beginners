@@ -1,0 +1,203 @@
+---
+title: "2 กล้องในฐานะเซนเซอร์"
+subtitle: "แยกวัตถุด้วยสีและรูปทรง นับจำนวน และแปลง pixel เป็น mm"
+---
+
+<div class="chain"><span class="on">Scene + Camera</span><span class="on">Pixels</span><span class="on">Features</span><span class="on">Measurand</span><span class="on">Calibration</span><span class="on">Uncertainty</span><span>Decision</span></div>
+
+## โจทย์
+
+ใบงาน 1 ได้ผลเร็ว แต่ AI เป็นกล่องดำ และค่าที่ได้เป็น pixel ใบงานนี้ไม่ใช้ AI แต่ดึงค่าที่วัดได้จาก **สี** และ **รูปทรง** ของวัตถุโดยตรง และทำครบทุกขั้นของห่วงโซ่การวัด ตั้งแต่รับภาพจนได้ขนาดในหน่วย mm พร้อมความไม่แน่นอน
+
+```text
+Camera (USB / IP) -> OpenCV                              (ส่วนที่ 1)
+BGR -> HSV -> color mask -> contour -> shape -> Count    (ส่วนที่ 2)
+Ruler -> mm/pixel -> object size (mm) -> Uncertainty     (ส่วนที่ 3)
+```
+
+**เมื่อจบใบงาน** นักศึกษาควรสามารถ
+
+- รับภาพจาก USB webcam หรือสมาร์ตโฟนที่เป็น IP camera
+- แยกวัตถุตามสีด้วยระบบสี HSV และจำแนกรูปทรงจาก contour
+- สอบเทียบกล้องอย่างง่ายเพื่อแปลง pixel เป็น mm และประเมินความไม่แน่นอน
+
+**อุปกรณ์:** กล้องพร้อมขาตั้งที่หันลงตั้งฉากกับโต๊ะ, แผ่นทดสอบ A, B, C จาก `data/test_sheets_02.pdf` (พิมพ์ขนาดจริง 100% ห้ามเลือก Fit to page), ไม้บรรทัดหรือเวอร์เนียร์
+
+## ส่วนที่ 1: รับภาพจากกล้อง
+
+### ใช้สมาร์ตโฟนเป็น IP camera {#sec-ipcam}
+
+ข้ามข้อนี้ได้ถ้าใช้ USB webcam (`SOURCE = 0`)
+
+1. ติดตั้งแอป **IP Webcam** (Android) หรือ **DroidCam** (Android/iOS)
+2. ต่อโทรศัพท์และคอมพิวเตอร์เข้า Wi-Fi เดียวกัน (หรือเปิด hotspot จากโทรศัพท์)
+3. IP Webcam: แตะ **Video preferences → Video resolution** เลือก **640x480** แล้วกลับหน้าหลัก เลื่อนลงล่างสุดแตะ **Start server**
+4. จด IP และ port ที่แสดงบนจอ เช่น `http://192.168.1.50:8080` แล้วเปิดด้วย browser บนคอมพิวเตอร์เพื่อยืนยันว่าเห็นภาพ
+
+| แอป | Port | Stream (ใช้กับ `VideoCapture`) | Snapshot (JPEG ทีละภาพ) |
+| :--- | :--- | :--- | :--- |
+| IP Webcam | 8080 | `/video` | `/shot.jpg` |
+| DroidCam | 4747 | `/video` | ดูในหน้าเว็บของแอป |
+
+### stream กับ snapshot
+
+```python
+import cv2
+import numpy as np
+import requests
+
+URL = "http://192.168.1.50:8080"        # change to your phone
+
+# stream: same code as a webcam or a video file
+cap = cv2.VideoCapture(URL + "/video")
+ret, frame = cap.read()
+print("stream:", frame.shape)
+
+# snapshot: request one JPEG over HTTP, then decode it
+resp = requests.get(URL + "/shot.jpg", timeout=2)
+arr = np.frombuffer(resp.content, dtype=np.uint8)
+frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+print("JPEG bytes:", len(resp.content), " decoded bytes:", frame.nbytes)
+```
+
+| รายการ | ค่า |
+| :--- | :--- |
+| frame.shape | |
+| ขนาด JPEG ที่รับมา (byte) | |
+| ขนาดภาพหลัง decode (byte) | |
+| อัตราส่วนการบีบอัด | |
+
+::: {.callout-note}
+## คำถาม
+เหตุใดข้อมูลที่ส่งผ่านเครือข่ายจึงเล็กกว่าภาพใน NumPy array มาก และการบีบอัด JPEG มีผลต่อคุณภาพภาพอย่างไร
+:::
+
+## ส่วนที่ 2: นับวัตถุด้วยสีและรูปทรง
+
+### แยกสีด้วย HSV
+
+ค่า BGR เปลี่ยนมากเมื่อความสว่างเปลี่ยน จึงแปลงเป็น **HSV** ซึ่งแยกเฉดสี (H) ความอิ่มตัว (S) และความสว่าง (V) ออกจากกัน ใน OpenCV ค่า H อยู่ในช่วง 0–179 ส่วน S และ V อยู่ในช่วง 0–255
+
+```python
+SOURCE = 0
+cap = cv2.VideoCapture(SOURCE)
+
+def show_hsv(event, x, y, flags, param):
+    if event == cv2.EVENT_LBUTTONDOWN:          # click to read HSV
+        print("HSV at", (x, y), "=", hsv[y, x])
+
+cv2.namedWindow("Camera")
+cv2.setMouseCallback("Camera", show_hsv)
+
+while True:
+    ret, frame = cap.read()
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    lo, hi = np.array([95, 100, 60]), np.array([130, 255, 255])   # blue
+    mask = cv2.inRange(hsv, lo, hi)             # 255 = inside the range
+    cv2.imshow("Camera", frame)
+    cv2.imshow("Mask", mask)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+```
+
+คลิกบนชิ้นงานแต่ละสีของแผ่น A อย่างน้อย 3 จุด เพื่อกำหนดช่วงของแต่ละสี
+
+| สี | HSV จุด 1 | HSV จุด 2 | HSV จุด 3 | lo | hi |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| แดง | | | | | |
+| เขียว | | | | | |
+| น้ำเงิน | | | | | |
+
+สีแดงอยู่ทั้งสองปลายของแกน H (ใกล้ 0 และใกล้ 179) จึงต้องใช้ 2 ช่วงแล้วรวมด้วย `|` และใช้ morphological opening (`cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)`) ลบจุดรบกวนเล็ก ๆ
+
+### จำแนกรูปทรงจาก contour
+
+**contour** คือเส้นขอบของบริเวณสีขาวใน mask จาก contour คำนวณได้ทั้งพื้นที่ $A$ เส้นรอบรูป $P$ จำนวนมุม และค่าความกลม
+
+$$
+C = \frac{4\pi A}{P^2}
+$$
+
+ค่าทางทฤษฎีของวงกลม สี่เหลี่ยมจัตุรัส และสามเหลี่ยมด้านเท่า คือ $1$, $\pi/4 \approx 0.785$ และ $\pi\sqrt{3}/9 \approx 0.605$
+
+```python
+MIN_AREA = 500                         # ignore small blobs (pixel^2)
+
+def classify(cnt):
+    area = cv2.contourArea(cnt)
+    peri = cv2.arcLength(cnt, True)
+    approx = cv2.approxPolyDP(cnt, 0.04 * peri, True)
+    circ = 4 * np.pi * area / peri ** 2
+    n = len(approx)                    # number of corners
+    # decide the shape from n (and circ)
+    # ______________________________   -> "triangle"
+    # ______________________________   -> "square"
+    # ______________________________   -> "circle"
+    return shape, n, circ
+
+contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+for cnt in contours:
+    if cv2.contourArea(cnt) < MIN_AREA:
+        continue
+    shape, n, circ = classify(cnt)
+    x, y, w, h = cv2.boundingRect(cnt)
+    cv2.drawContours(frame, [cnt], -1, (0, 255, 255), 2)
+    cv2.putText(frame, f"{shape} {circ:.2f}", (x, y - 5),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+```
+
+| รูปทรง | $A$ (pixel²) | $P$ (pixel) | $n$ | $C$ ที่วัดได้ | $C$ ทางทฤษฎี | ผลการจำแนก |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| วงกลม | | | | | 1.000 | |
+| สี่เหลี่ยม | | | | | 0.785 | |
+| สามเหลี่ยม | | | | | 0.605 | |
+
+### นับตามสีและรูปทรง
+
+วนทำทุกสีด้วย mask ของสีนั้น แล้วนับคู่ (สี, รูปทรง) บนแผ่น B (18 ชิ้น) และแผ่น C (ชิ้นงานแตะกัน) เทียบกับจำนวนจริง
+
+| แผ่น | จำนวนจริง | นับได้ | ชิ้นที่ผิด และสาเหตุ |
+| :--- | :--- | :--- | :--- |
+| B | 18 | | |
+| C | | | |
+
+## ส่วนที่ 3: จาก pixel เป็น mm
+
+### หาค่า scale factor
+
+วางไม้บรรทัด 100 mm ของแผ่น A ในภาพ วัดระยะระหว่างขีด 0 กับ 100 mm เป็น pixel ($d_{\mathrm{px}}$) โดยคลิก 2 จุด ทำซ้ำ 5 ครั้ง
+
+$$
+k = \frac{100\ \mathrm{mm}}{d_{\mathrm{px}}} \quad (\mathrm{mm/pixel})
+$$
+
+| ครั้งที่ | 1 | 2 | 3 | 4 | 5 | เฉลี่ย | S.D. |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| $d_{\mathrm{px}}$ (pixel) | | | | | | | |
+| $k$ (mm/pixel) | | | | | | | |
+
+### วัดขนาดและขอบเขตของการสอบเทียบ
+
+วัดความกว้างของชิ้นงานด้วย `cv2.boundingRect` หรือ `cv2.minAreaRect` แล้วคูณด้วย $k$ เทียบกับขนาดที่วัดด้วยเวอร์เนียร์ จากนั้นเปลี่ยนเงื่อนไขทีละอย่าง
+
+| เงื่อนไข | ขนาดจากกล้อง (mm) | $e$ (mm) | $e_{\mathrm{rel}}$ (%) |
+| :--- | :--- | :--- | :--- |
+| ชิ้นงานกลางภาพ | | | |
+| ชิ้นงานที่มุมภาพ | | | |
+| วางชิ้นงานบนหนังสือหนาประมาณ 3 cm | | | |
+| เอียงกล้องประมาณ 20 องศา | | | |
+
+::: {.callout-note}
+## คำถาม
+1. ค่า $k$ ค่าเดียวใช้ได้ทั้งภาพหรือไม่ เงื่อนไขใดทำให้ error มากที่สุด เพราะอะไร
+2. ความละเอียดของการวัด (1 pixel = กี่ mm) จำกัดความแม่นของระบบอย่างไร
+:::
+
+ปัญหาที่พบในตารางสุดท้ายจะแก้ในใบงาน 4 (กล้องเอียง) และใบงาน 5 (ชิ้นงานที่มุมภาพ)
+
+## ทบทวน
+
+- กล้องคือเซนเซอร์ที่ต้องผ่านห่วงโซ่ Scene → Pixels → Features → Measurand → Calibration → Uncertainty ก่อนได้ค่าที่ใช้ได้
+- HSV แยกเฉดสีออกจากความสว่าง จึงทนต่อแสงเปลี่ยนได้ดีกว่า BGR แต่ยังไม่ทนทั้งหมด
+- contour ให้ค่าทางเรขาคณิต (พื้นที่ เส้นรอบรูป จำนวนมุม ความกลม) ที่ใช้จำแนกและวัดขนาด
+- การสอบเทียบด้วยค่า $k$ ค่าเดียวใช้ได้เฉพาะเมื่อกล้องตั้งฉากและชิ้นงานอยู่ระนาบเดียวกับไม้บรรทัด

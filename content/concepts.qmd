@@ -1,0 +1,84 @@
+---
+title: "แนวคิดพื้นฐาน"
+subtitle: "สรุปแนวคิดของ OpenCV เรียงจาก pixel ขึ้นไป สำหรับค้นย้อนหลัง พร้อมลิงก์ไปใบงานที่ใช้"
+---
+
+ใบงานเรียงตามโจทย์ ไม่ได้เรียงตามแนวคิด หน้านี้รวบรวมแนวคิดทั้งหมดเรียงจากพื้นฐานขึ้นไป เพื่อใช้ทบทวนหรือค้นเมื่อต้องการ
+
+## ภาพและ pixel
+
+| แนวคิด | สรุป | คำสั่ง | ใบงาน |
+| --- | --- | --- | --- |
+| ภาพคือ array | ภาพสีคือ NumPy array `(height, width, 3)` ชนิด `uint8` ค่า 0–255 | `img.shape`, `img.dtype` | [1](01_counting.qmd) |
+| BGR | OpenCV เรียงสีเป็น B, G, R | `img[y, x]` → `[B, G, R]` | [1](01_counting.qmd) |
+| พิกัด | array ใช้ `img[y, x]` (แถว, คอลัมน์) ฟังก์ชันวาดใช้ `(x, y)` | `cv2.line(img, (x0, y0), (x1, y1), ...)` | [1](01_counting.qmd) |
+| slicing | ตัดหรือแก้บางส่วนของภาพ | `img[y0:y1, x0:x1]` | [1](01_counting.qmd) |
+| ย่อขยาย | ภาพเล็กประมวลผลเร็ว แต่เสียรายละเอียด | `cv2.resize(img, (w, h))` | [1](01_counting.qmd), [3](03_light_time.qmd) |
+| วิดีโอ | ภาพหลายภาพต่อเนื่อง อ่านทีละ frame | `cv2.VideoCapture`, `cap.read()` | [1](01_counting.qmd) |
+| JPEG | บีบอัดภาพเพื่อส่งผ่านเครือข่าย เสียรายละเอียดบางส่วน | `cv2.imdecode`, `cv2.imencode` | [2](02_camera_sensor.qmd) |
+
+## สีและความสว่าง
+
+| แนวคิด | สรุป | คำสั่ง | ใบงาน |
+| --- | --- | --- | --- |
+| grayscale | ลดเหลือ 1 ค่าต่อ pixel คือความสว่าง | `cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)` | [3](03_light_time.qmd) |
+| HSV | แยกเฉดสี (H 0–179) ความอิ่มตัว (S) ความสว่าง (V) | `cv2.COLOR_BGR2HSV` | [2](02_camera_sensor.qmd) |
+| mask | ภาพขาวดำที่ขาว = pixel ที่อยู่ในช่วงที่สนใจ | `cv2.inRange(hsv, lo, hi)` | [2](02_camera_sensor.qmd) |
+| histogram | จำนวน pixel ในแต่ละระดับความสว่าง | `cv2.calcHist` | [3](03_light_time.qmd) |
+| contrast | ความต่างของชิ้นงานกับพื้น $\lvert I_b - I_o\rvert / (I_b + I_o)$ | `gray[roi].mean()` | [3](03_light_time.qmd) |
+| noise | ความผันผวนของ pixel เดียวกันเมื่อถ่ายซ้ำ | `np.std(stack, axis=0)` | [3](03_light_time.qmd) |
+
+## แยกชิ้นงานออกจากพื้น
+
+| แนวคิด | สรุป | คำสั่ง | ใบงาน |
+| --- | --- | --- | --- |
+| threshold | แบ่ง pixel เป็นขาว/ดำด้วยค่าเดียว | `cv2.threshold(gray, t, 255, cv2.THRESH_BINARY)` | [3](03_light_time.qmd) |
+| Otsu | หา threshold ให้อัตโนมัติจาก histogram | `cv2.THRESH_OTSU` | [3](03_light_time.qmd), [5](05_gauging.qmd) |
+| blur | ลด noise โดยเฉลี่ยกับ pixel รอบข้าง (convolution) | `cv2.GaussianBlur(img, (5, 5), 0)` | [4](04_inspection.qmd) |
+| morphology | opening ลบจุดเล็ก closing ปิดรูเล็ก | `cv2.morphologyEx` | [2](02_camera_sensor.qmd) |
+| ผลต่างของภาพ | หาสิ่งที่ต่างจากภาพต้นแบบ | `cv2.absdiff(a, b)` | [4](04_inspection.qmd) |
+
+## รูปทรงและการวัด
+
+| แนวคิด | สรุป | คำสั่ง | ใบงาน |
+| --- | --- | --- | --- |
+| contour | เส้นขอบของบริเวณสีขาว | `cv2.findContours` | [2](02_camera_sensor.qmd) |
+| ลำดับชั้นของ contour | แยกขอบนอกกับรูด้านใน | `cv2.RETR_CCOMP`, `hierarchy` | [5](05_gauging.qmd) |
+| ค่าทางเรขาคณิต | พื้นที่ เส้นรอบรูป จำนวนมุม ความกลม $4\pi A/P^2$ | `cv2.contourArea`, `cv2.arcLength`, `cv2.approxPolyDP` | [2](02_camera_sensor.qmd) |
+| กรอบล้อมรอบ | สี่เหลี่ยมตรง สี่เหลี่ยมหมุนได้ วงกลม | `cv2.boundingRect`, `cv2.minAreaRect`, `cv2.minEnclosingCircle` | [2](02_camera_sensor.qmd), [5](05_gauging.qmd) |
+| ROI | บริเวณที่สนใจ ตรวจเฉพาะส่วนนั้น | slicing หรือ mask | [4](04_inspection.qmd) |
+
+## ตำแหน่งและการสอบเทียบ
+
+| แนวคิด | สรุป | คำสั่ง | ใบงาน |
+| --- | --- | --- | --- |
+| scale factor | mm ต่อ pixel จากวัตถุที่รู้ขนาด | $k = L_{\mathrm{mm}} / L_{\mathrm{px}}$ | [2](02_camera_sensor.qmd), [5](05_gauging.qmd) |
+| marker | จุดอ้างอิงที่หาตำแหน่งและหมายเลขได้แม่นยำ | `cv2.aruco.ArucoDetector` | [4](04_inspection.qmd) |
+| homography | แปลงระนาบเอียงเป็นภาพด้านบน | `cv2.getPerspectiveTransform`, `cv2.warpPerspective` | [4](04_inspection.qmd) |
+| lens distortion | เลนส์ทำให้เส้นตรงที่ขอบภาพโค้ง | `cv2.calibrateCamera`, `cv2.undistort` | [5](05_gauging.qmd) |
+
+## AI
+
+| แนวคิด | สรุป | คำสั่ง | ใบงาน |
+| --- | --- | --- | --- |
+| object detection | หาชนิดและ Bounding Box ของวัตถุ | `YOLO(...)(img)` | [1](01_counting.qmd) |
+| confidence | ความมั่นใจของโมเดล 0–1 | `obj.conf` | [1](01_counting.qmd) |
+| tracking | ให้ ID ประจำวัตถุข้าม frame | `model.track(..., persist=True)` | [1](01_counting.qmd) |
+
+## เวลาและความเชื่อถือได้
+
+| แนวคิด | สรุป | ใบงาน |
+| --- | --- | --- |
+| fps, เวลาประมวลผล, latency | อัตราการรับภาพ เวลาที่โค้ดใช้ต่อภาพ และความหน่วงจากเหตุการณ์จริง เป็นคนละค่ากัน | [3](03_light_time.qmd) |
+| motion blur | ชิ้นงานเคลื่อนระหว่างที่ชัตเตอร์เปิด จำกัดความเร็วสูงสุด | [3](03_light_time.qmd) |
+| error | $e = N_{\mathrm{measured}} - N_{\mathrm{reference}}$ | [1](01_counting.qmd), [2](02_camera_sensor.qmd) |
+| FRR, FAR | สัดส่วนของดีที่ถูกคัดทิ้ง และของเสียที่หลุดไป | [4](04_inspection.qmd) |
+| repeatability, %GRR | ความกระจายของการวัดซ้ำเทียบกับ tolerance | [5](05_gauging.qmd) |
+
+## อ่านเพิ่มเติม
+
+เว็บสอน OpenCV แบบเรียงจากพื้นฐาน ใช้ค้นรายละเอียดของแต่ละคำสั่ง
+
+- [OpenCV-Python Tutorials](https://docs.opencv.org/4.x/d6/d00/tutorial_py_root.html) (เอกสารทางการ)
+- [Getting Started with OpenCV](https://learnopencv.com/getting-started-with-opencv/) (LearnOpenCV)
+- [OpenCV Free Course](https://opencv.org/opencv-free-course/) (OpenCV.org)

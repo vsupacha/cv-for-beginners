@@ -1,0 +1,69 @@
+---
+title: "ส่วนขยาย"
+subtitle: "ทักษะ machine vision ที่ไม่อยู่ใน 5 ใบงาน สำหรับผู้ที่ต้องการทำต่อ"
+---
+
+หัวข้อเหล่านี้ใช้ในโรงงานเช่นกัน แต่ไม่ได้อยู่ใน 5 ใบงาน ทุกหัวข้อต่อยอดจากใบงานที่ระบุได้ทันที
+
+## อ่านรหัส QR และ barcode
+
+ต่อจาก [ใบงาน 4](04_inspection.qmd) ใช้ติดตามชิ้นงานแต่ละชิ้น (traceability) OpenCV มีตัวอ่านในตัว ไม่ต้องติดตั้งเพิ่ม
+
+```python
+qr = cv2.QRCodeDetector()
+text, points, _ = qr.detectAndDecode(frame)
+
+bar = cv2.barcode.BarcodeDetector()
+ok, texts, types, points = bar.detectAndDecode(frame)
+```
+
+แบบฝึก: วัดอัตราการอ่านสำเร็จ (read rate) เทียบกับขนาดพิมพ์ ระยะ มุม และ motion blur จาก[ใบงาน 3](03_light_time.qmd)
+
+## Template matching
+
+ต่อจาก [ใบงาน 4](04_inspection.qmd) หาตำแหน่งชิ้นงานโดยไม่ต้องมี marker ด้วยการเลื่อนภาพต้นแบบไปทั่วภาพแล้วหาจุดที่คล้ายที่สุด
+
+```python
+res = cv2.matchTemplate(gray, template, cv2.TM_CCOEFF_NORMED)
+_, score, _, top_left = cv2.minMaxLoc(res)
+```
+
+แบบฝึก: หมุนชิ้นงาน 0, 5, 10, 20 องศา แล้วดูว่า `score` ลดลงอย่างไร template matching ทนต่อการหมุนได้แค่ไหน
+
+## ตรวจสีด้วย $\Delta E$
+
+ต่อจาก [ใบงาน 2](02_camera_sensor.qmd) ระบบสี Lab ออกแบบให้ระยะห่างของสีใกล้เคียงกับที่ตาคนรับรู้ จึงใช้ตรวจสีฉลากหรือฝาขวดเทียบกับสีมาตรฐาน
+
+```python
+lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB).astype(np.float32)
+lab[..., 0] *= 100 / 255                    # OpenCV stores L as 0..255
+lab[..., 1:] -= 128
+delta_e = np.linalg.norm(lab[y, x] - reference_lab)   # CIE76
+```
+
+ค่า $\Delta E$ ประมาณ 2–3 คือความต่างที่ตาคนเริ่มสังเกตได้
+
+## เทรนโมเดลของตัวเอง
+
+ต่อจาก [ใบงาน 1](01_counting.qmd) และ [ใบงาน 4](04_inspection.qmd) ถ่ายชิ้นงานดีและเสียอย่างละประมาณ 50 ภาพ แยกโฟลเดอร์ `train/ok`, `train/ng`, `val/ok`, `val/ng` แล้วเทรนโมเดลจำแนกภาพ
+
+```python
+from ultralytics import YOLO
+model = YOLO("yolo26n-cls.pt")
+model.train(data="dataset", epochs=20, imgsz=224)
+```
+
+แบบฝึก: เทียบ FRR, FAR และเวลาต่อชิ้นกับวิธีกฎของใบงาน 4 และอภิปรายว่าเมื่อใดควรใช้ AI
+
+## เลือกกล้องก่อนซื้อ
+
+ต่อจาก [ใบงาน 3](03_light_time.qmd) คำนวณย้อนกลับแบบที่วิศวกรทำก่อนเลือกกล้อง
+
+1. ขนาดชิ้นงานบวกระยะเผื่อการวาง = ขอบเขตภาพ (FOV) เช่น 120 x 90 mm
+2. ตำหนิเล็กที่สุดที่ต้องเห็น เช่น 0.5 mm ต้องกว้างอย่างน้อย 3 pixel → 1 pixel ≤ 0.17 mm
+3. ความละเอียดที่ต้องใช้ = FOV / ขนาด pixel = 120 / 0.17 ≈ 720 pixel ในแนวนอน
+4. ตรวจความเร็ว: ชิ้นงานต่อนาทีและ motion blur ตามใบงาน 3
+
+## หน้าแสดงผลของสายการผลิต
+
+ต่อจาก [ใบงาน 5](05_gauging.qmd) อ่าน `inspection_log.csv` แล้วแสดง yield จำนวนชิ้นต่อนาที และกราฟขนาดที่วัดได้ตามเวลาด้วย Streamlit
