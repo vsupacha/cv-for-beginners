@@ -1,0 +1,145 @@
+---
+title: "ใบบันทึกผล ใบงาน 1: นับวัตถุด้วย AI"
+subtitle: "YOLO, เส้นนับ และ error เทียบการนับด้วยคน"
+---
+
+เขียนผลลงในตารางและกรอบคำตอบ แล้วส่งไฟล์ PDF เมื่อจบคาบ ขั้นตอนและโค้ดของแต่ละข้ออยู่ในหน้าเว็บใบงาน 1
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{63.8mm}|W{38.3mm}|W{51.0mm}|}\hline
+\textbf{ชื่อ-นามสกุล} & \textbf{รหัสนักศึกษา} & \textbf{หน้าที่ในส่วนที่ 1 / 2 / 3} \\\hline
+\rule{0pt}{8mm} &  &  \\\hline
+\rule{0pt}{8mm} &  &  \\\hline
+\rule{0pt}{8mm} &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{25.5mm}|W{38.3mm}|W{89.3mm}|}\hline
+\textbf{กลุ่ม} & \textbf{วันที่} & \textbf{แหล่งภาพที่ใช้ (SOURCE)} \\\hline
+\rule{0pt}{8mm} &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+## เริ่มต้น: โค้ดตั้งต้น
+
+$\square$ รัน `code/01_start.py` แล้วเห็นวิดีโอพร้อมกรอบรอบรถ
+
+## ส่วนที่ 1: ภาพคือตัวเลข
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{63.0mm}|W{94.4mm}|}\hline
+\textbf{รายการ} & \textbf{ค่า} \\\hline
+\rule{0pt}{9mm}Height x Width (pixel) &  \\\hline
+\rule{0pt}{9mm}จำนวน channel &  \\\hline
+\rule{0pt}{9mm}จำนวนตัวเลขทั้งภาพ &  \\\hline
+\rule{0pt}{9mm}ขนาดหลังย่อ 4 เท่า &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{24.1mm}|W{24.1mm}|W{30.1mm}|W{42.1mm}|W{24.1mm}|}\hline
+\textbf{ภาพ} & \textbf{จำนวนที่ตรวจพบ} & \textbf{ชนิด} & \textbf{ตัวอย่าง Bounding Box} & \textbf{confidence} \\\hline
+\rule{0pt}{12mm}car.jpg &  &  &  &  \\\hline
+\rule{0pt}{12mm}sports.jpg &  &  &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+1. ภาพ 1 pixel มีกี่ค่า แต่ละค่าหมายถึงอะไร และเหตุใดภาพใหญ่จึงประมวลผลช้า
+
+\answerbox[30mm]
+
+\newpage
+
+## ส่วนที่ 2: วิดีโอคือภาพหลายภาพ
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{24.8mm}|W{37.2mm}|W{43.4mm}|W{43.4mm}|}\hline
+\textbf{ย่อภาพ} & \textbf{ขนาด frame} & \textbf{ความเร็ว (ช้า/ปานกลาง/เร็ว)} & \textbf{จำนวนรถใน frame ตัวอย่าง} \\\hline
+\rule{0pt}{9mm}หาร 2 &  &  &  \\\hline
+\rule{0pt}{9mm}หาร 4 &  &  &  \\\hline
+\rule{0pt}{9mm}หาร 8 &  &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+2. รถคันเดียวกันถูกตรวจพบในหลาย frame ถ้ารวมจำนวนที่ตรวจพบทุก frame จะได้จำนวนรถที่ผ่านหรือไม่ เพราะเหตุใด
+
+\answerbox[35mm]
+
+
+3. การย่อภาพมีผลต่อความเร็วและความสามารถในการตรวจจับอย่างไร
+
+\answerbox[30mm]
+
+\newpage
+
+## ส่วนที่ 3: เส้นนับและ logic นับ
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{63.0mm}|W{94.4mm}|}\hline
+\textbf{รายการ} & \textbf{ค่า} \\\hline
+\rule{0pt}{9mm}ขนาด frame หลังย่อ &  \\\hline
+\rule{0pt}{9mm}LINE\_Y &  \\\hline
+\rule{0pt}{9mm}LINE\_X0, LINE\_X1 &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+เงื่อนไขที่เติมในช่อง 1, 2 และ 3 ของ logic นับ
+
+\answerbox[40mm]
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{33.4mm}|W{16.7mm}|W{16.7mm}|W{18.9mm}|W{18.9mm}|W{13.4mm}|W{17.8mm}|}\hline
+\textbf{วิดีโอ} & \textbf{ผู้นับ 1} & \textbf{ผู้นับ 2} & \textbf{Reference} & \textbf{Measured} & \textbf{$e$} & \textbf{$e_{\mathrm{rel}}$ (\%)} \\\hline
+\rule{0pt}{11mm}road\_03.mp4 &  &  &  &  &  &  \\\hline
+\rule{0pt}{11mm}วิดีโอที่เลือกเพิ่ม &  &  &  &  &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+วิจารณ์ผล: สาเหตุของ error และวิธีปรับปรุง
+
+\answerbox[45mm]
+
+\newpage
+
+
+4. เหตุใดต้องมีสถานะ car\_on\_line ถ้าไม่มีจะเกิดอะไรกับค่าที่นับได้
+
+\answerbox[35mm]
+
+
+5. logic นี้นับผิดในกรณีใดบ้าง
+
+\answerbox[35mm]
+
+
+6. ถ้าจะนำระบบนี้ไปนับขวดบนสายพานในโรงงานจริง ยังขาดอะไรบ้าง (เขียนเป็นรายการ จะใช้อีกครั้งในใบงาน 5)
+
+\answerbox[60mm]
+

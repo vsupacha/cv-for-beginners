@@ -5,6 +5,8 @@ project:
     - content/*.qmd
   resources:
     - data/**
+    - code/**
+    - worksheets/*.pdf
 
 website:
   title: "CV for Beginners"

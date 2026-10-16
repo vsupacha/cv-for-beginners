@@ -23,6 +23,49 @@ Counting line -> counting logic -> Count -> Error      (ส่วนที่ 3)
 
 **ไฟล์ที่ใช้:** `car.jpg`, `sports.jpg` และวิดีโอถนนจาก [Pexels](https://www.pexels.com/) (ค้นด้วยคำว่า `car road` เลือกวิดีโอที่ถนนตั้งฉากหรือขนานกับขอบภาพ) ดูรายการใน `data/README.md`
 
+**ใบบันทึกผล:** [ดาวน์โหลด PDF](../worksheets/01_sheet.pdf) เปิดบน tablet แล้วเขียนผลลงในตารางและกรอบคำตอบ ส่งเป็น PDF เมื่อจบคาบ
+
+## โค้ดตั้งต้น
+
+รันโค้ดนี้ให้ได้ผลก่อนเริ่มส่วนที่ 1 ดาวน์โหลดได้ที่ [`code/01_start.py`](../code/01_start.py) โค้ดนี้รันได้ด้วยตัวเอง ไม่ต้องใช้โค้ดจากใบงานก่อนหน้า แก้ `SOURCE` ให้ตรงกับกล้องหรือไฟล์ที่ใช้ ([ใบงาน 0](00_setup.qmd#sec-camera))
+
+```python
+"""Worksheet 1 starter: detect objects in every frame of a video with YOLO.
+
+Run: python 01_start.py      (press q in the image window to quit)
+"""
+import cv2
+from ultralytics import YOLO
+
+SOURCE = "road_03.mp4"          # a video file, or 0 for a webcam
+SCALE = 4                       # shrink each frame by this factor
+
+model = YOLO("yolo26n.pt")      # downloaded automatically on first run
+cap = cv2.VideoCapture(SOURCE)
+
+while True:
+    ret, frame = cap.read()
+    if not ret:                 # end of the video, or no camera
+        break
+    frame = cv2.resize(frame, (frame.shape[1] // SCALE, frame.shape[0] // SCALE))
+
+    results = model(frame, verbose=False)
+    view = results[0].plot()    # frame with boxes drawn
+
+    cv2.imshow("Worksheet 1", view)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
+```
+
+| ปุ่ม | ทำอะไร |
+| --- | --- |
+| `q` | หยุดโปรแกรม |
+
+**ตรวจว่าพร้อม:** เห็นวิดีโอพร้อมกรอบรอบรถ
+
 ## ส่วนที่ 1: ภาพคือตัวเลข
 
 ### อ่านภาพและดูข้อมูลของภาพ

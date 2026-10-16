@@ -23,6 +23,62 @@ Ruler -> mm/pixel -> object size (mm) -> Uncertainty     (ส่วนที่ 
 
 **อุปกรณ์:** กล้องพร้อมขาตั้งที่หันลงตั้งฉากกับโต๊ะ, แผ่นทดสอบ A, B, C จาก `data/test_sheets_02.pdf` (พิมพ์ขนาดจริง 100% ห้ามเลือก Fit to page), ไม้บรรทัดหรือเวอร์เนียร์
 
+**ใบบันทึกผล:** [ดาวน์โหลด PDF](../worksheets/02_sheet.pdf) เปิดบน tablet แล้วเขียนผลลงในตารางและกรอบคำตอบ ส่งเป็น PDF เมื่อจบคาบ
+
+## โค้ดตั้งต้น
+
+รันโค้ดนี้ให้ได้ผลก่อนเริ่มส่วนที่ 1 ดาวน์โหลดได้ที่ [`code/02_start.py`](../code/02_start.py) โค้ดนี้รันได้ด้วยตัวเอง ไม่ต้องใช้โค้ดจากใบงานก่อนหน้า แก้ `SOURCE` ให้ตรงกับกล้องหรือไฟล์ที่ใช้ ([ใบงาน 0](00_setup.qmd#sec-camera))
+
+```python
+"""Worksheet 2 starter: show the camera and read BGR / HSV values by clicking.
+
+Run: python 02_start.py      (click = print pixel values, s = save frame, q = quit)
+"""
+import cv2
+
+SOURCE = 0                      # 0 = USB webcam, or "http://192.168.1.50:8080/video"
+
+cap = cv2.VideoCapture(SOURCE)
+frame, hsv = None, None
+
+
+def on_click(event, x, y, flags, param):
+    if event == cv2.EVENT_LBUTTONDOWN and hsv is not None:
+        print("x, y =", (x, y), "  BGR =", frame[y, x], "  HSV =", hsv[y, x])
+
+
+cv2.namedWindow("Worksheet 2")
+cv2.setMouseCallback("Worksheet 2", on_click)
+saved = 0
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        print("Failed to grab frame: check SOURCE")
+        break
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    cv2.imshow("Worksheet 2", frame)
+    key = cv2.waitKey(1) & 0xFF
+    if key == ord('s'):
+        cv2.imwrite(f"frame_{saved:02d}.png", frame)
+        print("saved", f"frame_{saved:02d}.png")
+        saved += 1
+    elif key == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
+```
+
+| ปุ่ม | ทำอะไร |
+| --- | --- |
+| คลิกซ้าย | พิมพ์พิกัด ค่า BGR และ HSV ของ pixel ที่คลิก |
+| `s` | บันทึกภาพ |
+| `q` | หยุดโปรแกรม |
+
+**ตรวจว่าพร้อม:** เห็นภาพจากกล้อง และคลิกแล้วมีค่า HSV พิมพ์ในเทอร์มินัล
+
 ## ส่วนที่ 1: รับภาพจากกล้อง
 
 ### ใช้สมาร์ตโฟนเป็น IP camera {#sec-ipcam}

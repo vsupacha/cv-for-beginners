@@ -32,7 +32,7 @@ print(cv2.__version__, np.__version__)
 print(hasattr(cv2, "aruco"))     # True = ready for worksheet 4
 ```
 
-## ต่อกล้อง
+## ต่อกล้อง {#sec-camera}
 
 ทุกใบงานเปิดกล้องด้วยคำสั่งเดียวกัน `cv2.VideoCapture(SOURCE)` ต่างกันแค่ค่า `SOURCE`
 

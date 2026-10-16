@@ -32,6 +32,65 @@ Size vs tolerance -> OK/NG -> Serial -> UNO R4 -> LED      (ส่วนที�
 - เวอร์เนียร์คาลิปเปอร์
 - Arduino UNO R4 WiFi, LED เขียวและแดงพร้อมตัวต้านทาน 220 Ω
 
+**ใบบันทึกผล:** [ดาวน์โหลด PDF](../worksheets/05_sheet.pdf) เปิดบน tablet แล้วเขียนผลลงในตารางและกรอบคำตอบ ส่งเป็น PDF เมื่อจบคาบ
+
+## โค้ดตั้งต้น
+
+รันโค้ดนี้ให้ได้ผลก่อนเริ่มส่วนที่ 1 ดาวน์โหลดได้ที่ [`code/05_start.py`](../code/05_start.py) โค้ดนี้รันได้ด้วยตัวเอง ไม่ต้องใช้โค้ดจากใบงานก่อนหน้า แก้ `SOURCE` ให้ตรงกับกล้องหรือไฟล์ที่ใช้ ([ใบงาน 0](00_setup.qmd#sec-camera))
+
+```python
+"""Worksheet 5 starter: show the camera and find the checkerboard corners live.
+
+Run: python 05_start.py      (s = save frame, q = quit)
+"""
+import sys
+
+import cv2
+
+SOURCE = 0                      # 0 = USB webcam, or "http://192.168.1.50:8080/video"
+PATTERN = (9, 6)                # inner corners of data/checkerboard.pdf (columns, rows)
+SQUARE = 25.0                   # mm
+
+if isinstance(SOURCE, int) and sys.platform == "win32":
+    cap = cv2.VideoCapture(SOURCE, cv2.CAP_DSHOW)
+else:
+    cap = cv2.VideoCapture(SOURCE)
+
+saved = 0
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        print("Failed to grab frame: check SOURCE")
+        break
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    found, corners = cv2.findChessboardCorners(gray, PATTERN)
+
+    view = frame.copy()
+    if found:
+        cv2.drawChessboardCorners(view, PATTERN, corners, found)
+    cv2.putText(view, "board found" if found else "board not found", (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 200, 0) if found else (0, 0, 255), 2)
+
+    cv2.imshow("Worksheet 5", view)
+    key = cv2.waitKey(1) & 0xFF
+    if key == ord('s'):
+        cv2.imwrite(f"board_{saved:02d}.png", frame)
+        print("saved", f"board_{saved:02d}.png")
+        saved += 1
+    elif key == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
+```
+
+| ปุ่ม | ทำอะไร |
+| --- | --- |
+| `s` | บันทึกภาพ |
+| `q` | หยุดโปรแกรม |
+
+**ตรวจว่าพร้อม:** เห็นจุดมุมสีของ checkerboard และข้อความ board found
+
 ## ส่วนที่ 1: สอบเทียบกล้อง
 
 ### เก็บภาพ checkerboard

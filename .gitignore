@@ -13,3 +13,5 @@ code/**/runs/
 *_key.pdf
 
 /.quarto/
+worksheets/*_sheet.tex
+worksheets/*_files/

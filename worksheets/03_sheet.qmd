@@ -1,0 +1,156 @@
+---
+title: "ใบบันทึกผล ใบงาน 3: แสง เวลา และการรับภาพ"
+subtitle: "การจัดแสง, fps, latency และ motion blur"
+---
+
+เขียนผลลงในตารางและกรอบคำตอบ แล้วส่งไฟล์ PDF เมื่อจบคาบ ขั้นตอนและโค้ดของแต่ละข้ออยู่ในหน้าเว็บใบงาน 3
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{63.8mm}|W{38.3mm}|W{51.0mm}|}\hline
+\textbf{ชื่อ-นามสกุล} & \textbf{รหัสนักศึกษา} & \textbf{หน้าที่ในส่วนที่ 1 / 2 / 3} \\\hline
+\rule{0pt}{8mm} &  &  \\\hline
+\rule{0pt}{8mm} &  &  \\\hline
+\rule{0pt}{8mm} &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{25.5mm}|W{38.3mm}|W{89.3mm}|}\hline
+\textbf{กลุ่ม} & \textbf{วันที่} & \textbf{แหล่งภาพที่ใช้ (SOURCE)} \\\hline
+\rule{0pt}{8mm} &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+## เริ่มต้น: โค้ดตั้งต้น
+
+$\square$ รัน `code/03_start.py` แล้วเห็นภาพ grayscale และ histogram ที่เปลี่ยนตามแสง
+
+## ส่วนที่ 1: แสง
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{23.8mm}|W{26.1mm}|W{33.3mm}|W{21.4mm}|W{16.6mm}|W{19.0mm}|}\hline
+\textbf{แสง} & \textbf{contrast ลวดเสียบกระดาษ} & \textbf{contrast คลิปดำ (ตัวคลิป / ขาโลหะ)} & \textbf{contrast เทปใส} & \textbf{noise} & \textbf{Otsu threshold} \\\hline
+\rule{0pt}{11mm}ไฟห้อง &  & / &  &  &  \\\hline
+\rule{0pt}{11mm}แสงกระจาย &  & / &  &  &  \\\hline
+\rule{0pt}{11mm}backlight &  & / &  &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{25.5mm}|W{38.3mm}|W{89.3mm}|}\hline
+\textbf{แสง} & \textbf{contrast เทปใส} & \textbf{มุมของไฟฉายที่เห็นชัดที่สุด} \\\hline
+\rule{0pt}{11mm}แสงมุมต่ำ &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+1. ใต้ไฟห้อง threshold ค่าเดียวแยกลวดเสียบกระดาษได้ครบทั้งชิ้นหรือไม่ จุดสะท้อนทำให้เกิดอะไรกับภาพ binary
+
+\answerbox[28mm]
+
+
+2. คลิปดำมีสองวัสดุ แสงแบบใดทำให้ทั้งชิ้นกลายเป็นบริเวณเดียวกัน
+
+\answerbox[24mm]
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{30.6mm}|W{36.7mm}|W{85.7mm}|}\hline
+\textbf{ชิ้นงาน} & \textbf{แสงที่เหมาะ} & \textbf{เหตุผล} \\\hline
+\rule{0pt}{12mm}โลหะมันวาว &  &  \\\hline
+\rule{0pt}{12mm}หลายวัสดุ &  &  \\\hline
+\rule{0pt}{12mm}ใส &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+4. ถ้าแสงในโรงงานเปลี่ยนตลอดวัน ควรแก้ด้วยโค้ด (เช่น Otsu) หรือด้วยการจัดแสง เพราะอะไร
+
+\answerbox[26mm]
+
+\newpage
+
+## ส่วนที่ 2: อัตราเฟรมและความหน่วงเวลา
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{52.0mm}|W{23.1mm}|W{23.1mm}|W{23.1mm}|W{23.1mm}|}\hline
+\textbf{รายการ} & \textbf{ครั้งที่ 1} & \textbf{ครั้งที่ 2} & \textbf{ครั้งที่ 3} & \textbf{เฉลี่ย} \\\hline
+\rule{0pt}{9mm}อัตราเฟรมของกล้อง (fps) &  &  &  &  \\\hline
+\rule{0pt}{9mm}เวลาประมวลผล threshold (ms) &  &  &  &  \\\hline
+\rule{0pt}{9mm}เวลาประมวลผล YOLO (ms) &  &  &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{26.8mm}|W{14.6mm}|W{14.6mm}|W{14.6mm}|W{14.6mm}|W{14.6mm}|W{15.8mm}|W{15.8mm}|}\hline
+\textbf{ภาพที่} & \textbf{1} & \textbf{2} & \textbf{3} & \textbf{4} & \textbf{5} & \textbf{เฉลี่ย} & \textbf{S.D.} \\\hline
+\rule{0pt}{9mm}$t_{\mathrm{cam}}$ &  &  &  &  &  &  &  \\\hline
+\rule{0pt}{9mm}$t_{\mathrm{pc}}$ &  &  &  &  &  &  &  \\\hline
+\rule{0pt}{9mm}latency (ms) &  &  &  &  &  &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+5. fps สูงแปลว่า latency ต่ำเสมอหรือไม่ อธิบายพร้อมตัวอย่างจากผลการทดลอง
+
+\answerbox[35mm]
+
+\newpage
+
+## ส่วนที่ 3: ชิ้นงานเคลื่อนที่
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{21.5mm}|W{15.6mm}|W{15.6mm}|W{13.2mm}|W{14.4mm}|W{13.2mm}|W{19.1mm}|W{19.1mm}|}\hline
+\textbf{ครั้งที่} & \textbf{$D_{\mathrm{px}}$} & \textbf{$L_{\mathrm{px}}$} & \textbf{$b$} & \textbf{$\Delta x$} & \textbf{$f$} & \textbf{$t_{\mathrm{exp}}$ (ms)} & \textbf{$v$ (mm/s)} \\\hline
+\rule{0pt}{11mm}ดึงช้า &  &  &  &  &  &  &  \\\hline
+\rule{0pt}{11mm}ดึงเร็ว &  &  &  &  &  &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{78.7mm}|W{78.7mm}|}\hline
+\textbf{รายการ} & \textbf{ค่า} \\\hline
+\rule{0pt}{9mm}$k$ (mm/pixel) &  \\\hline
+\rule{0pt}{9mm}$v_{\max}$ เมื่อ $b_{\max}$ = 1 pixel (mm/s) &  \\\hline
+\rule{0pt}{9mm}ชิ้นต่อนาทีสูงสุด (threshold) &  \\\hline
+\rule{0pt}{9mm}ชิ้นต่อนาทีสูงสุด (YOLO) &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+6. ถ้าต้องเป่าลมคัดชิ้นงานเสียที่จุดห่างจากกล้อง 300 mm ความหน่วงเวลาที่วัดได้กำหนดความเร็วสายพานอย่างไร
+
+\answerbox[32mm]
+
+
+7. ถ้าต้องการให้สายพานเร็วขึ้นโดยภาพไม่เบลอ ต้องเปลี่ยนอะไร และต้องแลกกับอะไร
+
+\answerbox[30mm]
+

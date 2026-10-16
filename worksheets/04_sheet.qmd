@@ -1,0 +1,123 @@
+---
+title: "ใบบันทึกผล ใบงาน 4: ตรวจสอบชิ้นงาน OK/NG"
+subtitle: "ArUco, presence/absence, FRR และ FAR"
+---
+
+เขียนผลลงในตารางและกรอบคำตอบ แล้วส่งไฟล์ PDF เมื่อจบคาบ ขั้นตอนและโค้ดของแต่ละข้ออยู่ในหน้าเว็บใบงาน 4
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{63.8mm}|W{38.3mm}|W{51.0mm}|}\hline
+\textbf{ชื่อ-นามสกุล} & \textbf{รหัสนักศึกษา} & \textbf{หน้าที่ในส่วนที่ 1 / 2 / 3} \\\hline
+\rule{0pt}{8mm} &  &  \\\hline
+\rule{0pt}{8mm} &  &  \\\hline
+\rule{0pt}{8mm} &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{25.5mm}|W{38.3mm}|W{89.3mm}|}\hline
+\textbf{กลุ่ม} & \textbf{วันที่} & \textbf{แหล่งภาพที่ใช้ (SOURCE)} \\\hline
+\rule{0pt}{8mm} &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+## เริ่มต้น: โค้ดตั้งต้น
+
+$\square$ รัน `code/04_start.py` แล้วเห็นภาพถาดมุมบน พร้อมวงกลมสีแดงตรงช่องทั้ง 20 ช่อง
+
+## ส่วนที่ 1: หาตำแหน่งถาด
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{63.8mm}|W{44.7mm}|W{44.7mm}|}\hline
+\textbf{ทดลอง} & \textbf{พบ marker ครบ 4 ตัว} & \textbf{วงกลมตรงช่องทุกช่อง} \\\hline
+\rule{0pt}{9mm}ถาดตรง กลางภาพ &  &  \\\hline
+\rule{0pt}{9mm}หมุนถาด 20 องศา &  &  \\\hline
+\rule{0pt}{9mm}เอียงกล้อง 20 องศา &  &  \\\hline
+\rule{0pt}{9mm}เอานิ้วบัง marker 1 ตัว &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+1. เหตุใดภาพ top view จึงใช้ตำแหน่งช่องเดิมได้ทุกภาพ ไม่ว่าถาดจะวางเอียงแค่ไหน
+
+\answerbox[28mm]
+
+## ส่วนที่ 2: ตรวจถาด
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{18.5mm}|W{24.7mm}|W{27.2mm}|W{37.1mm}|W{37.1mm}|}\hline
+\textbf{ภาพ} & \textbf{ช่องว่างจริง} & \textbf{ช่องว่างที่ตรวจพบ} & \textbf{dark ratio ต่ำสุดของช่องที่มีของ} & \textbf{dark ratio สูงสุดของช่องว่าง} \\\hline
+\rule{0pt}{9mm}ok\_00 & ไม่มี &  &  &  \\\hline
+\rule{0pt}{9mm}ng\_00 &  &  &  &  \\\hline
+\rule{0pt}{9mm}ng\_01 &  &  &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+เงื่อนไขที่เติมใน present และ ok
+
+\answerbox[26mm]
+
+\newpage
+
+## ส่วนที่ 3: เครื่องตรวจตัดสินผิดบ่อยแค่ไหน
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{31.5mm}|W{14.3mm}|W{14.3mm}|W{14.3mm}|W{14.3mm}|W{14.3mm}|W{14.3mm}|W{14.3mm}|}\hline
+\textbf{MIN\_STAIN} & \textbf{5} & \textbf{10} & \textbf{15} & \textbf{20} & \textbf{25} & \textbf{30} & \textbf{40} \\\hline
+\rule{0pt}{9mm}FRR (\%) &  &  &  &  &  &  &  \\\hline
+\rule{0pt}{9mm}FAR (\%) &  &  &  &  &  &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+เกณฑ์ที่เลือก: MIN\_STAIN = \rule{30mm}{0.4pt}
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{61.2mm}|W{45.9mm}|W{45.9mm}|}\hline
+\textbf{} & \textbf{ตัดสิน OK} & \textbf{ตัดสิน NG} \\\hline
+\rule{0pt}{12mm}ถาดดีจริง (15) &  &  \\\hline
+\rule{0pt}{12mm}ถาดเสียจริง (15) &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+2. เมื่อเพิ่ม MIN\_STAIN ค่า FRR และ FAR เปลี่ยนไปอย่างไร ทำไมจึงลดทั้งสองค่าพร้อมกันไม่ได้
+
+\answerbox[30mm]
+
+
+3. ถาดยา (ของเสียหลุดไม่ได้) กับถาดขนม (ของดีทิ้งแพง) ควรเลือกเกณฑ์ต่างกันอย่างไร
+
+\answerbox[28mm]
+
+\newpage
+
+
+4. ถาดเสียที่เครื่องตรวจไม่พบมีลักษณะอย่างไร ควรแก้ที่แสง กล้อง หรือโค้ด
+
+\answerbox[35mm]
+
+
+5. ถ้าคราบมีได้หลายแบบมากจนเขียนกฎไม่ครบ ควรเปลี่ยนไปใช้ AI แบบใบงาน 1 หรือไม่ ต้องเตรียมอะไรบ้าง
+
+\answerbox[40mm]
+

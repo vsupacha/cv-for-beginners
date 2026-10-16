@@ -1,0 +1,17 @@
+project:
+  type: default
+
+lang: th
+papersize: a4
+fontsize: 12pt
+author: "ผศ.ดร.ศุภชัย วรพจน์พิศุทธิ์"
+format:
+  pdf:
+    pdf-engine: xelatex
+    documentclass: article
+    geometry:
+      - top=20mm
+      - left=22mm
+      - bottom=20mm
+      - right=22mm
+    include-in-header: sheet_header.tex

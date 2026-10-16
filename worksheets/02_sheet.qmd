@@ -1,0 +1,144 @@
+---
+title: "ใบบันทึกผล ใบงาน 2: กล้องในฐานะเซนเซอร์"
+subtitle: "สี HSV, contour และ pixel เป็น mm"
+---
+
+เขียนผลลงในตารางและกรอบคำตอบ แล้วส่งไฟล์ PDF เมื่อจบคาบ ขั้นตอนและโค้ดของแต่ละข้ออยู่ในหน้าเว็บใบงาน 2
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{63.8mm}|W{38.3mm}|W{51.0mm}|}\hline
+\textbf{ชื่อ-นามสกุล} & \textbf{รหัสนักศึกษา} & \textbf{หน้าที่ในส่วนที่ 1 / 2 / 3} \\\hline
+\rule{0pt}{8mm} &  &  \\\hline
+\rule{0pt}{8mm} &  &  \\\hline
+\rule{0pt}{8mm} &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{25.5mm}|W{38.3mm}|W{89.3mm}|}\hline
+\textbf{กลุ่ม} & \textbf{วันที่} & \textbf{แหล่งภาพที่ใช้ (SOURCE)} \\\hline
+\rule{0pt}{8mm} &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+## เริ่มต้น: โค้ดตั้งต้น
+
+$\square$ รัน `code/02_start.py` แล้วเห็นภาพจากกล้อง และคลิกแล้วมีค่า HSV พิมพ์ในเทอร์มินัล
+
+## ส่วนที่ 1: รับภาพจากกล้อง
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{63.0mm}|W{94.4mm}|}\hline
+\textbf{รายการ} & \textbf{ค่า} \\\hline
+\rule{0pt}{9mm}กล้องที่ใช้ (USB / แอป) &  \\\hline
+\rule{0pt}{9mm}IP address : port &  \\\hline
+\rule{0pt}{9mm}URL ของ stream &  \\\hline
+\rule{0pt}{9mm}frame.shape &  \\\hline
+\rule{0pt}{9mm}ขนาด JPEG ที่รับมา (byte) &  \\\hline
+\rule{0pt}{9mm}ขนาดภาพหลัง decode (byte) &  \\\hline
+\rule{0pt}{9mm}อัตราส่วนการบีบอัด &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+1. ถ้าเชื่อมต่อ IP camera ไม่ได้ ควรตรวจอะไรบ้าง เรียงตามลำดับ
+
+\answerbox[30mm]
+
+
+2. เหตุใดข้อมูลที่ส่งผ่านเครือข่ายจึงเล็กกว่าภาพใน NumPy array มาก และ JPEG มีผลต่อคุณภาพภาพอย่างไร
+
+\answerbox[30mm]
+
+\newpage
+
+## ส่วนที่ 2: นับวัตถุด้วยสีและรูปทรง
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{19.3mm}|W{24.2mm}|W{24.2mm}|W{24.2mm}|W{24.2mm}|W{24.2mm}|}\hline
+\textbf{สี} & \textbf{HSV จุด 1} & \textbf{HSV จุด 2} & \textbf{HSV จุด 3} & \textbf{lo} & \textbf{hi} \\\hline
+\rule{0pt}{9mm}แดง &  &  &  &  &  \\\hline
+\rule{0pt}{9mm}เขียว &  &  &  &  &  \\\hline
+\rule{0pt}{9mm}น้ำเงิน &  &  &  &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+เงื่อนไขที่เติมใน classify()
+
+\answerbox[30mm]
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{22.3mm}|W{22.3mm}|W{20.1mm}|W{11.1mm}|W{20.1mm}|W{17.8mm}|W{22.3mm}|}\hline
+\textbf{รูปทรง} & \textbf{$A$ (pixel$^2$)} & \textbf{$P$ (pixel)} & \textbf{$n$} & \textbf{$C$ ที่วัดได้} & \textbf{$C$ ทฤษฎี} & \textbf{ผลจำแนก} \\\hline
+\rule{0pt}{9mm}วงกลม &  &  &  &  & 1.000 &  \\\hline
+\rule{0pt}{9mm}สี่เหลี่ยม &  &  &  &  & 0.785 &  \\\hline
+\rule{0pt}{9mm}สามเหลี่ยม &  &  &  &  & 0.605 &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{14.6mm}|W{24.4mm}|W{24.4mm}|W{85.4mm}|}\hline
+\textbf{แผ่น} & \textbf{จำนวนจริง} & \textbf{นับได้} & \textbf{ชิ้นที่ผิด และสาเหตุ} \\\hline
+\rule{0pt}{14mm}B & 18 &  &  \\\hline
+\rule{0pt}{14mm}C &  &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+\newpage
+
+## ส่วนที่ 3: จาก pixel เป็น mm
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{33.5mm}|W{12.9mm}|W{12.9mm}|W{12.9mm}|W{12.9mm}|W{12.9mm}|W{16.8mm}|W{16.8mm}|}\hline
+\textbf{ครั้งที่} & \textbf{1} & \textbf{2} & \textbf{3} & \textbf{4} & \textbf{5} & \textbf{เฉลี่ย} & \textbf{S.D.} \\\hline
+\rule{0pt}{9mm}$d_{\mathrm{px}}$ (pixel) &  &  &  &  &  &  &  \\\hline
+\rule{0pt}{9mm}$k$ (mm/pixel) &  &  &  &  &  &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{56.3mm}|W{37.5mm}|W{27.5mm}|W{27.5mm}|}\hline
+\textbf{เงื่อนไข} & \textbf{ขนาดจากกล้อง (mm)} & \textbf{$e$ (mm)} & \textbf{$e_{\mathrm{rel}}$ (\%)} \\\hline
+\rule{0pt}{9mm}ชิ้นงานกลางภาพ &  &  &  \\\hline
+\rule{0pt}{9mm}ชิ้นงานที่มุมภาพ &  &  &  \\\hline
+\rule{0pt}{9mm}วางบนหนังสือหนา 3 cm &  &  &  \\\hline
+\rule{0pt}{9mm}เอียงกล้อง 20 องศา &  &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+3. ค่า $k$ ค่าเดียวใช้ได้ทั้งภาพหรือไม่ เงื่อนไขใดทำให้ error มากที่สุด เพราะอะไร
+
+\answerbox[35mm]
+
+
+4. ความละเอียดของการวัด (1 pixel = กี่ mm) จำกัดความแม่นของระบบอย่างไร
+
+\answerbox[30mm]
+

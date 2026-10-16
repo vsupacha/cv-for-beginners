@@ -1,0 +1,149 @@
+---
+title: "ใบบันทึกผล ใบงาน 5: วัดขนาดและสถานีตรวจ"
+subtitle: "สอบเทียบกล้อง, %GRR และสถานี OK/NG"
+---
+
+เขียนผลลงในตารางและกรอบคำตอบ แล้วส่งไฟล์ PDF เมื่อจบคาบ ขั้นตอนและโค้ดของแต่ละข้ออยู่ในหน้าเว็บใบงาน 5
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{63.8mm}|W{38.3mm}|W{51.0mm}|}\hline
+\textbf{ชื่อ-นามสกุล} & \textbf{รหัสนักศึกษา} & \textbf{หน้าที่ในส่วนที่ 1 / 2 / 3} \\\hline
+\rule{0pt}{8mm} &  &  \\\hline
+\rule{0pt}{8mm} &  &  \\\hline
+\rule{0pt}{8mm} &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{25.5mm}|W{38.3mm}|W{89.3mm}|}\hline
+\textbf{กลุ่ม} & \textbf{วันที่} & \textbf{แหล่งภาพที่ใช้ (SOURCE)} \\\hline
+\rule{0pt}{8mm} &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+## เริ่มต้น: โค้ดตั้งต้น
+
+$\square$ รัน `code/05_start.py` แล้วเห็นจุดมุมของ checkerboard และข้อความ board found
+
+## ส่วนที่ 1: สอบเทียบกล้อง
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{65.6mm}|W{91.8mm}|}\hline
+\textbf{ค่า} & \textbf{ผลที่ได้} \\\hline
+\rule{0pt}{9mm}reprojection error (pixel) &  \\\hline
+\rule{0pt}{9mm}$f_x$, $f_y$ (pixel) &  \\\hline
+\rule{0pt}{9mm}$c_x$, $c_y$ (pixel) &  \\\hline
+\rule{0pt}{9mm}$k_1$, $k_2$ &  \\\hline
+\rule{0pt}{9mm}$k$ (mm/pixel) จาก checkerboard บนจอ &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{51.0mm}|W{51.0mm}|W{51.0mm}|}\hline
+\textbf{เงื่อนไข} & \textbf{error ก่อนแก้ distortion (mm)} & \textbf{error หลังแก้ (mm)} \\\hline
+\rule{0pt}{9mm}ชิ้นงานกลางภาพ &  &  \\\hline
+\rule{0pt}{9mm}ชิ้นงานที่มุมภาพ &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+## ส่วนที่ 2: วัดขนาดและความทำซ้ำได้
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{20.8mm}|W{28.6mm}|W{31.2mm}|W{43.0mm}|W{20.8mm}|}\hline
+\textbf{ชิ้นงาน} & \textbf{เวอร์เนียร์ (mm)} & \textbf{$d$ จากพื้นที่ (mm)} & \textbf{$d$ จาก minEnclosingCircle (mm)} & \textbf{$e$ (mm)} \\\hline
+\rule{0pt}{9mm}1 บาท &  &  &  &  \\\hline
+\rule{0pt}{9mm}5 บาท &  &  &  &  \\\hline
+\rule{0pt}{9mm}10 บาท &  &  &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+\newpage
+
+ค่าที่วัดซ้ำ 30 ครั้ง (mm)
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{28.6mm}|W{17.9mm}|W{17.9mm}|W{17.9mm}|W{17.9mm}|W{17.9mm}|W{17.9mm}|}\hline
+\textbf{ครั้งที่} & \textbf{1} & \textbf{2} & \textbf{3} & \textbf{4} & \textbf{5} & \textbf{6} \\\hline
+\rule{0pt}{8mm}1--6 &  &  &  &  &  &  \\\hline
+\rule{0pt}{8mm}7--12 &  &  &  &  &  &  \\\hline
+\rule{0pt}{8mm}13--18 &  &  &  &  &  &  \\\hline
+\rule{0pt}{8mm}19--24 &  &  &  &  &  &  \\\hline
+\rule{0pt}{8mm}25--30 &  &  &  &  &  &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{78.7mm}|W{78.7mm}|}\hline
+\textbf{รายการ} & \textbf{ค่า} \\\hline
+\rule{0pt}{9mm}ค่าเฉลี่ย (mm) &  \\\hline
+\rule{0pt}{9mm}$\sigma_{\mathrm{meas}}$ (mm) &  \\\hline
+\rule{0pt}{9mm}1 pixel = กี่ mm &  \\\hline
+\rule{0pt}{9mm}\%GRR ถ้า tolerance $\pm$0.5 mm &  \\\hline
+\rule{0pt}{9mm}\%GRR ถ้า tolerance $\pm$0.1 mm &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+## ส่วนที่ 3: สถานีตรวจ
+
+
+```{=latex}
+\begin{center}
+\begin{tabular}{|W{78.7mm}|W{78.7mm}|}\hline
+\textbf{รายการ} & \textbf{ค่า} \\\hline
+\rule{0pt}{9mm}NOMINAL, TOL ที่ตั้ง (mm) &  \\\hline
+\rule{0pt}{9mm}ชิ้นที่ตัดสินถูก / ทั้งหมด &  \\\hline
+\rule{0pt}{9mm}เวลาตั้งแต่วางชิ้นงานจนไฟติด (ms) &  \\\hline
+\rule{0pt}{9mm}ชิ้นต่อนาทีสูงสุด &  \\\hline
+\end{tabular}
+\end{center}
+```
+
+
+เงื่อนไขที่เติมในโปรแกรมสถานีตรวจ
+
+\answerbox[20mm]
+
+\newpage
+
+
+1. ระบบของคุณใช้ตรวจชิ้นงานที่ tolerance $\pm$0.1 mm ได้หรือไม่ ถ้าไม่ได้ต้องปรับอะไร และแต่ละทางแลกกับอะไร
+
+\answerbox[40mm]
+
+
+2. เหตุใด $d$ จากพื้นที่กับ $d$ จาก minEnclosingCircle จึงต่างกัน ควรใช้ค่าใดถ้าชิ้นงานมีรอยบิ่นที่ขอบ
+
+\answerbox[30mm]
+
+
+3. การรอให้ได้ผลเดียวกัน 5 ภาพติดกัน ช่วยเรื่องใด และทำให้เสียอะไร
+
+\answerbox[28mm]
+
+
+4. เทียบกับรายการ ``ยังขาดอะไร'' ที่เขียนท้ายใบงาน 1 ตอนนี้ระบบของคุณมีข้อใดแล้ว และยังขาดข้อใด
+
+\answerbox[45mm]
+

@@ -30,8 +30,74 @@ Moving part -> blur (pixel) -> max speed -> parts/min       (ส่วนที�
 - กล้องพร้อมขาตั้ง (โทรศัพท์เครื่องที่ 1 หรือ USB webcam)
 - โทรศัพท์หรือแท็บเล็ตเครื่องที่ 2 ใช้เป็นไฟฉายและ backlight, กระดาษ A4 สีขาว
 - กล่องกระดาษ (เช่น กล่องกระดาษ A4) บุด้านในด้วยกระดาษขาว เจาะรูด้านบนให้กล้องมองลง
-- ชิ้นงาน 3 ชนิด: **ลวดเสียบกระดาษ** (โลหะมันวาว), **คลิปหนีบกระดาษสีดำ** (สองวัสดุ), **ไม้บรรทัดพลาสติกใส** (โปร่งใส)
+- ชิ้นงาน 3 ชนิด: **ลวดเสียบกระดาษ** (โลหะมันวาว), **คลิปหนีบกระดาษสีดำ** (สองวัสดุ), **เทปใสยาวประมาณ 5 cm แปะบนกระดาษขาว** (โปร่งใส)
 - แถบกระดาษที่พิมพ์จุดดำขนาด 10 mm จาก `data/motion_strip.pdf` (พิมพ์ขนาดจริง 100%)
+
+**ใบบันทึกผล:** [ดาวน์โหลด PDF](../worksheets/03_sheet.pdf) เปิดบน tablet แล้วเขียนผลลงในตารางและกรอบคำตอบ ส่งเป็น PDF เมื่อจบคาบ
+
+## โค้ดตั้งต้น
+
+รันโค้ดนี้ให้ได้ผลก่อนเริ่มส่วนที่ 1 ดาวน์โหลดได้ที่ [`code/03_start.py`](../code/03_start.py) โค้ดนี้รันได้ด้วยตัวเอง ไม่ต้องใช้โค้ดจากใบงานก่อนหน้า แก้ `SOURCE` ให้ตรงกับกล้องหรือไฟล์ที่ใช้ ([ใบงาน 0](00_setup.qmd#sec-camera))
+
+```python
+"""Worksheet 3 starter: camera with locked settings, grayscale image and live histogram.
+
+Run: python 03_start.py      (p = camera settings, s = save frame, q = quit)
+"""
+import sys
+
+import cv2
+import numpy as np
+
+SOURCE = 0                      # 0 = USB webcam, or "http://192.168.1.50:8080/video"
+
+if isinstance(SOURCE, int) and sys.platform == "win32":
+    cap = cv2.VideoCapture(SOURCE, cv2.CAP_DSHOW)   # DirectShow can open the settings dialog
+else:
+    cap = cv2.VideoCapture(SOURCE)
+
+
+def histogram_image(gray, height=200):
+    """Draw the 256-bin histogram of a grayscale image."""
+    hist = cv2.calcHist([gray], [0], None, [256], [0, 256]).ravel()
+    canvas = np.full((height, 256), 255, np.uint8)
+    for v in range(256):
+        h = int((height - 10) * hist[v] / hist.max())
+        cv2.line(canvas, (v, height - 1), (v, height - 1 - h), 0)
+    return canvas
+
+
+saved = 0
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        print("Failed to grab frame: check SOURCE")
+        break
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    cv2.imshow("Worksheet 3", gray)
+    cv2.imshow("Histogram", histogram_image(gray))
+    key = cv2.waitKey(1) & 0xFF
+    if key == ord('p'):
+        cap.set(cv2.CAP_PROP_SETTINGS, 1)           # turn off auto exposure / white balance here
+    elif key == ord('s'):
+        cv2.imwrite(f"light_{saved:02d}.png", frame)
+        print("saved", f"light_{saved:02d}.png")
+        saved += 1
+    elif key == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
+```
+
+| ปุ่ม | ทำอะไร |
+| --- | --- |
+| `p` | เปิดหน้าต่างตั้งค่ากล้อง (Windows + USB webcam) |
+| `s` | บันทึกภาพ |
+| `q` | หยุดโปรแกรม |
+
+**ตรวจว่าพร้อม:** เห็นภาพ grayscale และ histogram ที่เปลี่ยนตามแสง
 
 ## ส่วนที่ 1: แสง
 
@@ -102,7 +168,7 @@ noise = np.std(np.array(stack), axis=0).mean()      # mean S.D. over all pixels
 print(f"noise = {noise:.2f} gray levels")
 ```
 
-| แสง | contrast ลวดเสียบกระดาษ | contrast คลิปดำ (ตัวคลิป / ขาโลหะ) | contrast ไม้บรรทัดใส | noise | Otsu threshold |
+| แสง | contrast ลวดเสียบกระดาษ | contrast คลิปดำ (ตัวคลิป / ขาโลหะ) | contrast เทปใส | noise | Otsu threshold |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | ไฟห้อง | | / | | | |
 | แสงกระจาย | | / | | | |
@@ -110,11 +176,13 @@ print(f"noise = {noise:.2f} gray levels")
 
 ### แสงมุมต่ำสำหรับวัตถุใส
 
-ไม้บรรทัดใสแทบหายไปใน backlight เพราะแสงผ่านได้ ให้ลองอีกแบบ: ปิดไฟห้อง วางโทรศัพท์เครื่องที่ 2 ราบกับโต๊ะห่างชิ้นงานประมาณ 20 cm เปิดไฟฉายให้แสง **ส่องเฉียดผิวโต๊ะ** แสงที่กระทบขอบและรอยขีดจะสะท้อนขึ้นกล้อง ขอบไม้บรรทัดจึงสว่างบนพื้นมืด (low-angle หรือ dark-field lighting ซึ่งโรงงานใช้หารอยขีดบนผิว)
+เทปใสแทบมองไม่เห็นทั้งใต้ไฟห้องและใน backlight เพราะแสงผ่านได้ ให้ลองอีกแบบ: ปิดไฟห้อง วางโทรศัพท์เครื่องที่ 2 ราบกับโต๊ะห่างชิ้นงานประมาณ 20 cm เปิดไฟฉายให้แสง **ส่องเฉียดผิวกระดาษ** ผิวเทปที่มันกว่ากระดาษและขอบเทปจะสะท้อนแสงต่างจากกระดาษ เทปจึงปรากฏชัดขึ้น (low-angle หรือ dark-field lighting ซึ่งโรงงานใช้หารอยขีดบนผิว และตรวจว่าติดฟิล์มหรือฉลากใสแล้วหรือยัง) ลองหมุนทิศของไฟฉายรอบชิ้นงานเพื่อหามุมที่เห็นชัดที่สุด
 
-| แสง | contrast ขอบไม้บรรทัดใส |
+| แสง | contrast เทปใส |
 | :--- | :--- |
 | แสงมุมต่ำ | |
+
+**ทดลองเพิ่ม (ถ้ามีเวลา):** วางด้ามปากกาลูกลื่นใสบน backlight วัตถุใสทรงโค้งหักเหแสงเหมือนเลนส์ จะเห็นขอบดำบาง ๆ และแถบสว่างกลางด้าม ต่างจากเทปใสที่เป็นแผ่นแบน อธิบายว่าเพราะอะไร
 
 ### histogram และ threshold
 
