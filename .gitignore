@@ -15,3 +15,6 @@ code/**/runs/
 /.quarto/
 worksheets/*_sheet.tex
 worksheets/*_files/
+
+# Local AI-assistant working files (kept in the parent folder)
+.claude/
